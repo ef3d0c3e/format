@@ -31,7 +31,7 @@ struct format_output {
 
 	// Allocators
 	void* (*malloc)(size_t);
-	void (*free)(void*);
+	void (*free)(void*, size_t);
 	void* (*realloc)(void*, size_t, size_t);
 };
 

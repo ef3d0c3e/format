@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "buffer.h"
 #include <assert.h>
 #include <errno.h>
@@ -20,7 +21,7 @@ format_output_fd(int fd)
 		.style = kFormatStyleNone,
 		.fd = fd,
 		.file = NULL,
-		.flush_mode = kFormatFlushNever,
+		.flush_mode = kFormatFlushNever_,
 		.data = NULL,
 		.size = 0,
 		.capacity = 0,
@@ -59,7 +60,7 @@ format_output_buf(void)
 		.style = kFormatStyleNone,
 		.fd = -1,
 		.file = NULL,
-		.flush_mode = kFormatFlushNever,
+		.flush_mode = kFormatFlushNever_,
 		.data = NULL,
 		.size = 0,
 		.capacity = 0,
@@ -75,7 +76,7 @@ format_output_destroy(struct format_output* output);
 void
 format_output_set_allocator(struct format_output* output,
                             void* (*malloc)(size_t),
-                            void (*free)(void*),
+                            void (*free)(void*, size_t),
                             void* (*realloc)(void*, size_t, size_t))
 {
 	assert(output->data == NULL);
@@ -90,6 +91,7 @@ void
 format_output_set_flush(struct format_output* output, enum format_output_flush_mode mode)
 {
 	assert(output->fd != -1 || output->file != NULL);
+	format_output_flush(output);
 	output->flush_mode = mode;
 	// TODO: stdio
 }
@@ -98,22 +100,33 @@ int
 format_output_flush(struct format_output* output)
 {
 	if (output->fd != -1) {
-		const ssize_t r = write(output->fd, output->data, output->size);
+		size_t total = 0;
+		while (total != output->size)
+		{
+			const ssize_t n = write(output->fd, output->data + total, output->size - total);
+			if (n == -1)
+			{
+				if (errno != EINTR) {
+					output->size = 0;
+					return -1;
+				}
+			}
+			total += (size_t)n;
+		}
 		output->size = 0;
-		return (r == -1) ? -1 : 0;
 	} else if (output->file != NULL) {
 		return fflush(output->file);
 	}
 	return 0;
 }
 
-/// INTERNAL
-
 int
 format_output_write(struct format_output* output, const char* buf, size_t len)
 {
 	/* File descriptor */
 	if (output->fd != -1) {
+		assert(output->file == NULL);
+		assert(output->flush_mode != kFormatFlushNever_);
 		if (output->flush_mode == kFormatFlushAlways) {
 			size_t total = 0;
 			do {
@@ -140,22 +153,97 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 				return -1;
 			output->capacity = 1024;
 		}
+		assert(output->data != NULL);
 
-		/* Write first bytes */
 		size_t total = 0;
-		if (output->size < output->capacity)
-		{
-			const size_t avail = output->capacity - output->size;
-			const size_t to_write = (avail > len) ? len : avail;
-			memcpy(output->data + output->size, buf, to_write);
-			total += to_write;
-		}
+		if (output->size + len > output->capacity) {
+			/* Write and flush until last block */
+			while (1) {
+				if (output->size + len - total <= output->capacity)
+					break;
+				assert(total <= len);
+				const size_t avail = output->capacity - output->size;
+				assert(avail <= len - total);
+				memcpy(output->data, buf + total, avail);
+				if (unlikely(format_output_flush(output) == -1))
+					return -1;
+				total += avail;
+			}
 
-		/* Write leftover */
-		while (total < len)
-		{
+			assert(total <= len && len - total < output->capacity);
+			assert(output->size == 0);
+			/* Write last block, optionally flush */
+			if (output->flush_mode == kFormatFlushNewline) {
+				const void* nl = memrchr(buf + total, '\n', len - total);
 
+				if (nl) {
+					/* Write until last flush point, flush, then write leftover */
+					memcpy(output->data,
+					       output->data + total,
+					       (uintptr_t)nl - (uintptr_t)output->data + total + 1);
+					if (unlikely(format_output_flush(output) == -1))
+						return -1;
+					total += (uintptr_t)nl - (uintptr_t)output->data + 1;
+					memcpy(output->data, buf + total, len - total);
+					output->size = len - total;
+					total = len;
+				} else {
+					/* Write everything */
+					memcpy(output->data, buf + total, len - total);
+					output->size = len - total;
+					total = len;
+				}
+			} else {
+				/* Write last block */
+				assert(output->flush_mode == kFormatFlushNone);
+				memcpy(output->data, buf + total, total - len);
+				output->size = total - len;
+				total = len;
+			}
 		}
+		assert(total == len);
+	}
+	/* STDIO file */
+	else if (output->file != NULL) {
+		assert(output->fd == -1);
+
+		size_t total = 0;
+		while (total != len) {
+			const size_t n = fwrite(buf + total, 1, len - total, output->file);
+			if (n != len - total) {
+				if (errno != EINTR)
+					return -1;
+			}
+			total += n;
+		}
+		assert(total == len);
+	}
+	/* Memory buffer */
+	else {
+		assert(output->file == NULL && output->fd == -1);
+
+		/* Compute new capacity */
+		size_t new_cap = output->capacity;
+		while (new_cap < output->size + len) {
+			new_cap *= 2;
+		}
+		assert(new_cap >= len + output->size);
+
+		/* Make space */
+		if (output->realloc) {
+			output->data = output->realloc(output->data, output->capacity, new_cap);
+		} else {
+			output->data = realloc(output->data, new_cap);
+		}
+		if (unlikely(output->data == NULL)) {
+			output->capacity = 0;
+			return -1;
+		}
+		output->capacity = new_cap;
+
+		/* Copy */
+		memcpy(output->data + output->size, buf, len);
+		output->size += len;
 	}
 
 	return 0;

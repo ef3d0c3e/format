@@ -36,7 +36,7 @@ enum format_output_flush_mode
 	kFormatFlushAlways = 2,
 	/** @brief Never flush, should be used when `fd == -1 || file == NULL`, to format to a memory
 	   buffer */
-	kFormatFlushNever = 3,
+	kFormatFlushNever_ = 3,
 };
 
 // Format output buffer
@@ -83,7 +83,7 @@ format_output_destroy(struct format_output* output);
 void
 format_output_set_allocator(struct format_output* output,
                             void* (*malloc)(size_t),
-                            void (*free)(void*),
+                            void (*free)(void*, size_t),
                             void* (*realloc)(void*, size_t, size_t));
 /**
  * @brief Set the output flushing mode
@@ -99,5 +99,18 @@ format_output_set_flush(struct format_output* output, enum format_output_flush_m
  */
 int
 format_output_flush(struct format_output* output);
+/**
+ * @brief Writes raw bytes to the output
+ *
+ * @param output @ref format_output to write to
+ * @param buf Buffer to write
+ * @param len Number of bytes in @p buf to write
+ *
+ * This function writes the bytes from @p buf into @p output, allocating and flushing as required
+ *
+ * @return 0 on success, -1 on failure
+ */
+int
+format_output_write(struct format_output* output, const char* buf, size_t len);
 
 #endif // LIBFORMAT_H
