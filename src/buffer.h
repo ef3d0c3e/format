@@ -4,6 +4,9 @@
 #include "../include/format.h"
 #include <stdio.h>
 
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 struct format_output {
 	// Style + Color
 	/** @brief Foreground color */
@@ -33,6 +36,8 @@ struct format_output {
 	void* (*malloc)(size_t);
 	void (*free)(void*, size_t);
 	void* (*realloc)(void*, size_t, size_t);
+
+	// TODO: Store target color/style rendering data
 };
 
 int format_output_write(struct format_output *output, const char *buf, size_t len);

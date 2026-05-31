@@ -21,7 +21,7 @@ format_output_fd(int fd)
 		.style = kFormatStyleNone,
 		.fd = fd,
 		.file = NULL,
-		.flush_mode = kFormatFlushNever_,
+		.flush_mode = kFormatFlushNewline,
 		.data = NULL,
 		.size = 0,
 		.capacity = 0,
@@ -71,7 +71,21 @@ format_output_buf(void)
 }
 
 void
-format_output_destroy(struct format_output* output);
+format_output_destroy(struct format_output* output)
+{
+	assert(output != NULL);
+	format_output_flush(output);
+	if (output->data)
+	{
+		if (output->free)
+			output->free(output->data, output->capacity);
+		else
+			free(output->data);
+		output->data = NULL;
+		output->size = 0;
+		output->capacity = 0;
+	}
+}
 
 void
 format_output_set_allocator(struct format_output* output,
@@ -79,6 +93,10 @@ format_output_set_allocator(struct format_output* output,
                             void (*free)(void*, size_t),
                             void* (*realloc)(void*, size_t, size_t))
 {
+	assert(output != NULL);
+	assert(malloc != NULL);
+	assert(free != NULL);
+	assert(realloc != NULL);
 	assert(output->data == NULL);
 	assert(output->size == 0);
 	assert(output->capacity == 0);
@@ -90,7 +108,9 @@ format_output_set_allocator(struct format_output* output,
 void
 format_output_set_flush(struct format_output* output, enum format_output_flush_mode mode)
 {
-	assert(output->fd != -1 || output->file != NULL);
+	assert(output != NULL);
+	assert((output->fd != -1 || output->file != NULL) && "Invalid output type");
+
 	format_output_flush(output);
 	output->flush_mode = mode;
 	// TODO: stdio
@@ -99,6 +119,8 @@ format_output_set_flush(struct format_output* output, enum format_output_flush_m
 int
 format_output_flush(struct format_output* output)
 {
+	assert(output != NULL);
+
 	if (output->fd != -1) {
 		size_t total = 0;
 		while (total != output->size)
@@ -123,6 +145,9 @@ format_output_flush(struct format_output* output)
 int
 format_output_write(struct format_output* output, const char* buf, size_t len)
 {
+	assert(output != NULL);
+	assert(buf != NULL);
+
 	/* File descriptor */
 	if (output->fd != -1) {
 		assert(output->file == NULL);

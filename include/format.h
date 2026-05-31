@@ -113,4 +113,6 @@ format_output_flush(struct format_output* output);
 int
 format_output_write(struct format_output* output, const char* buf, size_t len);
 
+#define format(fmt_buf, fmt_str, ...)
+
 #endif // LIBFORMAT_H
