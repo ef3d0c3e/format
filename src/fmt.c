@@ -91,7 +91,7 @@ utf8_len(const char* str, size_t len)
  * @return The parsed numeric value
  */
 static inline size_t
-parse_number(const char* fmt_spec, size_t* i, const struct fmt_env env)
+parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 {
 	size_t size = 0;
 	/* Reference */
@@ -101,10 +101,10 @@ parse_number(const char* fmt_spec, size_t* i, const struct fmt_env env)
 		while (isdigit(fmt_spec[*i])) {
 			size = size * 10 + (size_t)(fmt_spec[*i] - '0');
 			++*i;
-			assert(size < env.size &&
+			assert(size < env->size &&
 			       "Cannot reference element past the number of formatting arguments");
 		}
-		size = *(const size_t*)env.args[size].data;
+		size = *(const size_t*)env->args[size].data;
 		assert(size <= 16384 && "Size cannot exceed 16384");
 		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
 		++*i;
@@ -129,12 +129,12 @@ parse_number(const char* fmt_spec, size_t* i, const struct fmt_env env)
  * @return Parsed @ref number_spec for @p fmt_spec
  */
 static inline struct number_spec
-parse_number_spec(const char* fmt_spec, const struct fmt_env env)
+parse_number_spec(const char* fmt_spec, const struct fmt_env* env)
 {
 	struct number_spec spec = {
 		.fill = { ' ', 0, 0, 0, 0 }, /* Space */
-		.align = '<',          /* Left */
-		.sign = '-',           /* Negative only */
+		.align = '<',                /* Left */
+		.sign = '-',                 /* Negative only */
 		.alternate = 0,
 		.zero = 0,
 		.width = 0,
@@ -152,7 +152,7 @@ parse_number_spec(const char* fmt_spec, const struct fmt_env env)
 	/* Parse align */
 	const size_t len = utf8_len(fmt_spec, 5); /* Get width of the alignment character codepoint */
 	assert(len <= 5);
-	if (strchr("<>^", fmt_spec[len]))         /* Custom character */
+	if (strchr("<>^", fmt_spec[len])) /* Custom character */
 	{
 		spec.align = fmt_spec[len];
 		strncpy((char*)spec.fill, fmt_spec, len);
@@ -195,13 +195,15 @@ parse_number_spec(const char* fmt_spec, const struct fmt_env env)
 	return spec;
 }
 
-static inline void
-write_aligned(struct format_output *output, const struct number_spec *spec, const char *buf, size_t len)
+static inline int
+write_aligned(struct format_output* output,
+              const struct number_spec* spec,
+              const char* buf,
+              size_t len)
 {
 	/* Padding */
 	size_t right = 0, left = 0;
-	switch (spec->align)
-	{
+	switch (spec->align) {
 		/* Center */
 		case '^':
 			right = spec->width / 2;
@@ -224,20 +226,23 @@ write_aligned(struct format_output *output, const struct number_spec *spec, cons
 	if (right > len) /* Right */
 	{
 		for (size_t i = 0; i < right - len; ++i)
-			format_output_write(output, spec->fill, fill_len);
+		{
+			if (format_output_write(output, spec->fill, fill_len)) return -1;
+		}
 	}
-	format_output_write(output, buf, len);
+	if (format_output_write(output, buf, len)) return -1;
 	if (left > len) /* Left */
 	{
 		for (size_t i = 0; i < left - len; ++i)
-			format_output_write(output, spec->fill, fill_len);
+			if (format_output_write(output, spec->fill, fill_len)) return -1;
 	}
+	return 0;
 }
 
-void
+int
 format_fmt_long(struct format_output* output,
                 const char* fmt_spec,
-                const struct fmt_env env,
+                const struct fmt_env* env,
                 size_t idx)
 {
 	struct number_spec spec = parse_number_spec(fmt_spec, env);
@@ -247,7 +252,7 @@ format_fmt_long(struct format_output* output,
 	assert(strchr("xXbB", spec.type) != NULL && "Invalid display type");
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
-	const long val = *(const long*)env.args[idx].data;
+	const long val = *(const long*)env->args[idx].data;
 	char buf[sizeof(long) * 8 + 16];
 
 	/* Get base */
@@ -295,5 +300,5 @@ format_fmt_long(struct format_output* output,
 		}
 	}
 
-	write_aligned(output, &spec, buf, len);
+	return write_aligned(output, &spec, buf, len);
 }

@@ -38,6 +38,7 @@ next(const char* fmt, size_t i, size_t* start, size_t* end)
 static inline void
 write_escaped(struct format_output* output, const char* buf, size_t len)
 {
+	// TODO: Error
 	for (size_t i = 0; i < len;) {
 		assert(buf[i] != 0);
 		/* Emit one */
@@ -59,16 +60,17 @@ write_escaped(struct format_output* output, const char* buf, size_t len)
  * @param fg Foreground color to apply
  * @param bg Background color to apply
  * @param style Style to apply
+ *
+ * @return `0` on success, `-1` on errors
  */
-static inline void
+static inline int
 write_style(struct format_output* output,
                     format_color fg,
                     format_color bg,
                     enum format_output_style style)
 {
 	if (style == kFormatStyleReset) {
-		format_output_write(output, "\033[0m", 4);
-		return;
+		return format_output_write(output, "\033[0m", 4);
 	}
 
 	char buf[256];
@@ -158,7 +160,8 @@ write_style(struct format_output* output,
 		buf[i++] = 'm';
 	}
 	if (i > 0)
-		format_output_write(output, buf, i);
+		return format_output_write(output, buf, i);
+	return 0;
 }
 
 /**
@@ -241,8 +244,9 @@ fmt_style(struct format_output* output, const char* fmt, size_t* i)
 }
 
 void
-format_args(struct format_output* output, const char* fmt, const struct fmt_env env)
+format_args(struct format_output* output, const char* fmt, const struct fmt_env* env)
 {
+	// TODO: Err handling
 	size_t cur_positional = 0;
 	for (size_t i = 0; fmt[i];) {
 		size_t start, end;
@@ -279,7 +283,7 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 			}
 		} else
 			index = cur_positional++;
-		assert(index < env.size);
+		assert(index < env->size);
 
 		/* Find delimiters */
 		const char* sep = strchr(fmt + i, ':');
@@ -289,8 +293,8 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 			sep = fmt + end;
 
 		/* Call formatter */
-		assert(env.args[index].formatter != NULL);
-		env.args[index].formatter(output, sep, env, index);
+		assert(env->args[index].formatter != NULL);
+		env->args[index].formatter(output, sep, env, index);
 		i = end + 1;
 	}
 }
