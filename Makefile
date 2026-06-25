@@ -1,6 +1,6 @@
 NAME := fmt
 CC := gcc
-CFLAGS := -Wall -Wextra -Wconversion -pedantic -ggdb -std=c99
+CFLAGS := -Wall -Wextra -Wconversion -pedantic -ggdb -std=gnu23
 IFLAGS := -I./include
 LFLAGS :=
 

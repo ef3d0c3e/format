@@ -75,8 +75,7 @@ format_output_destroy(struct format_output* output)
 {
 	assert(output != NULL);
 	format_output_flush(output);
-	if (output->data)
-	{
+	if (output->data) {
 		if (output->free)
 			output->free(output->data, output->capacity);
 		else
@@ -123,11 +122,9 @@ format_output_flush(struct format_output* output)
 
 	if (output->fd != -1) {
 		size_t total = 0;
-		while (total != output->size)
-		{
+		while (total != output->size) {
 			const ssize_t n = write(output->fd, output->data + total, output->size - total);
-			if (n == -1)
-			{
+			if (n == -1) {
 				if (errno != EINTR) {
 					output->size = 0;
 					return -1;
@@ -153,9 +150,9 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 		assert(output->file == NULL);
 		assert(output->flush_mode != kFormatFlushNever_);
 		if (output->flush_mode == kFormatFlushAlways) {
-			size_t total = 0;
+			size_t pos = 0;
 			do {
-				ssize_t n = write(output->fd, buf + total, len - total);
+				ssize_t n = write(output->fd, buf + pos, len - pos);
 				if (n < 0 && errno == EINTR)
 					continue;
 				else if (n < 0) {
@@ -163,8 +160,8 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 					break;
 				} else if (n == 0)
 					continue;
-				total += (size_t)n;
-			} while (total < len);
+				pos += (size_t)n;
+			} while (pos < len);
 			return 0;
 		}
 
@@ -180,68 +177,74 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 		}
 		assert(output->data != NULL);
 
-		size_t total = 0;
+		size_t pos = 0;
+		/* Write and flush all blocks until the last block */
 		if (output->size + len > output->capacity) {
 			/* Write and flush until last block */
 			while (1) {
-				if (output->size + len - total <= output->capacity)
+				if (output->size + len - pos <= output->capacity)
 					break;
-				assert(total <= len);
+				assert(pos <= len);
 				const size_t avail = output->capacity - output->size;
-				assert(avail <= len - total);
-				memcpy(output->data, buf + total, avail);
+				assert(avail <= len - pos);
+				memcpy(output->data, buf + pos, avail);
 				if (unlikely(format_output_flush(output) == -1))
 					return -1;
-				total += avail;
+				pos += avail;
 			}
-
-			assert(total <= len && len - total < output->capacity);
 			assert(output->size == 0);
-			/* Write last block, optionally flush */
-			if (output->flush_mode == kFormatFlushNewline) {
-				const void* nl = memrchr(buf + total, '\n', len - total);
-
-				if (nl) {
-					/* Write until last flush point, flush, then write leftover */
-					memcpy(output->data,
-					       output->data + total,
-					       (uintptr_t)nl - (uintptr_t)output->data + total + 1);
-					if (unlikely(format_output_flush(output) == -1))
-						return -1;
-					total += (uintptr_t)nl - (uintptr_t)output->data + 1;
-					memcpy(output->data, buf + total, len - total);
-					output->size = len - total;
-					total = len;
-				} else {
-					/* Write everything */
-					memcpy(output->data, buf + total, len - total);
-					output->size = len - total;
-					total = len;
-				}
-			} else {
-				/* Write last block */
-				assert(output->flush_mode == kFormatFlushNone);
-				memcpy(output->data, buf + total, total - len);
-				output->size = total - len;
-				total = len;
-			}
 		}
-		assert(total == len);
+
+		assert(pos <= len && len - pos < output->capacity);
+		/* Write last block, optionally flush */
+		if (output->flush_mode == kFormatFlushNewline) {
+			const void* nl = memrchr(buf + pos, '\n', len - pos);
+
+			if (nl) {
+				const size_t flush_point = (uintptr_t)nl - (uintptr_t)(buf + pos) + 1;
+				/* Write until after last `\n` (flush_point), flush, then write leftover */
+				memcpy(output->data + output->size,
+				       buf + pos,
+				       flush_point);
+				output->size += flush_point;
+				pos += flush_point;
+				/* Flush so all complete lines appear */
+				if (unlikely(format_output_flush(output) == -1))
+					return -1;
+				/* Copy leftover */
+				memcpy(output->data, buf + pos, len - pos);
+				output->size = len - pos;
+				pos = len;
+			} else {
+				/* Write everything */
+				assert(output->size + len - pos <= output->capacity);
+				memcpy(output->data + output->size, buf + pos, len - pos);
+				output->size += len - pos;
+				pos = len;
+			}
+		} else {
+			/* Write last block */
+			assert(output->flush_mode == kFormatFlushNone);
+			memcpy(output->data, buf + pos, pos - len);
+			output->size = pos - len;
+			pos = len;
+		}
+		assert(pos == len);
 	}
 	/* STDIO file */
 	else if (output->file != NULL) {
 		assert(output->fd == -1);
 
-		size_t total = 0;
-		while (total != len) {
-			const size_t n = fwrite(buf + total, 1, len - total, output->file);
-			if (n != len - total) {
+		size_t pos = 0;
+		while (pos != len) {
+			const size_t n = fwrite(buf + pos, 1, len - pos, output->file);
+			if (n != len - pos) {
 				if (errno != EINTR)
 					return -1;
 			}
-			total += n;
+			pos += n;
 		}
-		assert(total == len);
+		assert(pos == len);
 	}
 	/* Memory buffer */
 	else {

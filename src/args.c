@@ -220,7 +220,7 @@ fmt_style(struct format_output* output, const char* fmt, size_t* i)
 				style = kFormatStyleReset;
 				++*i;
 			} else {
-				while (strchr("biuc", fmt[*i])) {
+				while (strchr("bciu", fmt[*i])) {
 					style |= (fmt[*i] == 'b') * kFormatStyleBold |
 					         (fmt[*i] == 'i') * kFormatStyleItalic |
 					         (fmt[*i] == 'u') * kFormatStyleUnderline |
@@ -244,7 +244,7 @@ fmt_style(struct format_output* output, const char* fmt, size_t* i)
 }
 
 void
-format_args(struct format_output* output, const char* fmt, const struct fmt_env* env)
+format_args(struct format_output* output, const char* fmt, const struct fmt_env env)
 {
 	// TODO: Err handling
 	size_t cur_positional = 0;
@@ -283,7 +283,7 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env*
 			}
 		} else
 			index = cur_positional++;
-		assert(index < env->size);
+		assert(index < env.size);
 
 		/* Find delimiters */
 		const char* sep = strchr(fmt + i, ':');
@@ -293,8 +293,8 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env*
 			sep = fmt + end;
 
 		/* Call formatter */
-		assert(env->args[index].formatter != NULL);
-		env->args[index].formatter(output, sep, env, index);
+		assert(env.args[index].formatter != NULL);
+		env.args[index].formatter(output, sep, &env, index);
 		i = end + 1;
 	}
 }

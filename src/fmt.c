@@ -104,7 +104,8 @@ parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 			assert(size < env->size &&
 			       "Cannot reference element past the number of formatting arguments");
 		}
-		size = *(const size_t*)env->args[size].data;
+		// TODO enforce variant
+		size = (size_t)env->args[size].data;
 		assert(size <= 16384 && "Size cannot exceed 16384");
 		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
 		++*i;
@@ -252,7 +253,7 @@ format_fmt_long(struct format_output* output,
 	assert(strchr("xXbB", spec.type) != NULL && "Invalid display type");
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
-	const long val = *(const long*)env->args[idx].data;
+	const long val = (long)env->args[idx].data;
 	char buf[sizeof(long) * 8 + 16];
 
 	/* Get base */
@@ -286,6 +287,7 @@ format_fmt_long(struct format_output* output,
 		long x = val;
 		for (size_t i = 0; x; ++i) {
 			const int d = (int)(x % base);
+			x /= base;
 			switch (spec.type) {
 				case 'x':
 					buf[len - i - 1] = "01234567489abcdef"[d];

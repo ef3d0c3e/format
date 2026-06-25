@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 /** @brief Format style */
 enum format_output_style
@@ -41,6 +42,26 @@ enum format_output_flush_mode
 
 // Format output buffer
 struct format_output;
+
+// TODO: Enforce 4096 max args
+struct fmt_env
+{
+	/** @brief Stack allocated array of arguments */
+	struct fmt_arg* args;
+	/** @brief Number of arguments */
+	size_t size;
+};
+
+struct fmt_arg
+{
+	/** @brief Custom formatter */
+	int (*formatter)(struct format_output* output,
+	                 const char* fmt_spec,
+	                 const struct fmt_env*,
+	                 size_t idx);
+	/** @brief Raw data */
+	uintptr_t data;
+};
 
 /**
  * @brief Create a new @ref format_output from a file descriptor
@@ -134,10 +155,36 @@ format_fmt_long(struct format_output* output,
                 const struct fmt_env* env,
                 size_t idx);
 
+// TEMP
+int
+format_fmt_long_long(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_int(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_short(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_char(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_unsigned_long_long(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_unsigned_long(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_unsigned_int(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_unsigned_short(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_unsigned_char(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_float(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_double(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
+format_fmt_str(struct format_output*, const char*, const struct fmt_env*, size_t);
+
 /** @} */
 
 void
-format_args(struct format_output* output, const char* fmt, const struct fmt_env* env);
+format_args(struct format_output* output, const char* fmt, const struct fmt_env env);
 
 /**
  * @defgroup Macros Helper macros
@@ -251,13 +298,15 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env*
 
 #define FMT__SET(N, ARG)                                                                         \
 	{                                                                                            \
-		_Static_assert(sizeof(typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))) <= sizeof(void*),    \
+		_Static_assert(sizeof(typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))) <= sizeof(uint64_t), \
 		               "Invalid argument type");                                                 \
 		if (__builtin_types_compatible_p(const void*,                                            \
 		                                 typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG))))) {        \
-			args[N].data = FMT__SELECT(1, FMT__ARG_EXPAND(ARG));                                 \
+			args[N].data = (uintptr_t)FMT__SELECT(1, FMT__ARG_EXPAND(ARG));                            \
 		} else {                                                                                 \
-			args[N].data = &FMT__SELECT(1, FMT__ARG_EXPAND(ARG));                                \
+			const typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG))) temp =                            \
+			  FMT__SELECT(1, FMT__ARG_EXPAND(ARG));                                              \
+			memcpy(&args[N].data, &temp, sizeof(temp));                                          \
 		}                                                                                        \
 	}
 
@@ -277,10 +326,10 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env*
 		};                                                                                       \
 		FMT__IF_ELSE(FMT__HAS_ARGS(__VA_ARGS__))(                                                \
 		  FMT__EXPAND(FMT__EVAL(FMT__MAP(counter_base, FMT__SET, __VA_ARGS__))))()               \
-		  format_args(                                                                            \
+		  format_args(                                                                           \
 		    output,                                                                              \
 		    fmt,                                                                                 \
-		    (struct fmt_env){ .args = args, .size = sizeof(args) / sizeof(args[0]) - 1 });       \
+		    (const struct fmt_env){ .args = args, .size = sizeof(args) / sizeof(args[0]) - 1 }); \
 	} while (0)
 
 /** @} */
