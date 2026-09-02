@@ -200,6 +200,8 @@ format_fmt_unsigned_int(struct format_output*, const char*, const struct fmt_env
 int
 format_fmt_unsigned_short(struct format_output*, const char*, const struct fmt_env*, size_t);
 int
+format_fmt_signed_char(struct format_output*, const char*, const struct fmt_env*, size_t);
+int
 format_fmt_unsigned_char(struct format_output*, const char*, const struct fmt_env*, size_t);
 int
 format_fmt_float(struct format_output*, const char*, const struct fmt_env*, size_t);
@@ -306,18 +308,21 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 	                    __builtin_types_compatible_p(unsigned char, typeof(ARG)),                \
 	                    ((struct fmt_arg){ format_fmt_unsigned_char, 0 }),                       \
 	                    __builtin_choose_expr(                                                   \
-	                      __builtin_types_compatible_p(double, typeof(ARG)),                     \
-	                      ((struct fmt_arg){ format_fmt_double, 0 }),                            \
+	                      __builtin_types_compatible_p(signed char, typeof(ARG)),                \
+	                      ((struct fmt_arg){ format_fmt_signed_char, 0 }),                       \
 	                      __builtin_choose_expr(                                                 \
-	                        __builtin_types_compatible_p(float, typeof(ARG)),                    \
-	                        ((struct fmt_arg){ format_fmt_float, 0 }),                           \
+	                        __builtin_types_compatible_p(double, typeof(ARG)),                   \
+	                        ((struct fmt_arg){ format_fmt_double, 0 }),                          \
 	                        __builtin_choose_expr(                                               \
-	                          __builtin_types_compatible_p(const char*, typeof(ARG)) ||          \
-	                            __builtin_types_compatible_p(char*, typeof(ARG)) ||              \
-	                            __builtin_types_compatible_p(const char[], typeof(ARG)) ||       \
-	                            __builtin_types_compatible_p(char[], typeof(ARG)),               \
-	                          ((struct fmt_arg){ format_fmt_str, 0 }),                           \
-	                          ((struct fmt_arg){ NULL, 0 }))))))))))))))
+	                          __builtin_types_compatible_p(float, typeof(ARG)),                  \
+	                          ((struct fmt_arg){ format_fmt_float, 0 }),                         \
+	                          __builtin_choose_expr(                                             \
+	                            __builtin_types_compatible_p(const char*, typeof(ARG)) ||        \
+	                              __builtin_types_compatible_p(char*, typeof(ARG)) ||            \
+	                              __builtin_types_compatible_p(const char[], typeof(ARG)) ||     \
+	                              __builtin_types_compatible_p(char[], typeof(ARG)),             \
+	                            ((struct fmt_arg){ format_fmt_str, 0 }),                         \
+	                            ((struct fmt_arg){ NULL, 0 })))))))))))))))
 #define FMT__MAPPER(N, ARG)                                                                      \
 	FMT__IF_ELSE(FMT__IS_TUPLE(ARG))(                                                            \
 	  ((struct fmt_arg){ FMT__SELECT(0, FMT__ARG_EXPAND(ARG)), 0 }))(                            \
@@ -329,7 +334,7 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 		               "Invalid argument type");                                                 \
 		if (__builtin_types_compatible_p(const void*,                                            \
 		                                 typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG))))) {        \
-			args[N].data = (uintptr_t)FMT__SELECT(1, FMT__ARG_EXPAND(ARG));                            \
+			args[N].data = (uintptr_t)FMT__SELECT(1, FMT__ARG_EXPAND(ARG));                      \
 		} else {                                                                                 \
 			const typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG))) temp =                            \
 			  FMT__SELECT(1, FMT__ARG_EXPAND(ARG));                                              \
@@ -339,8 +344,8 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 
 #define format(output, fmt, ...)                                                                 \
 	do {                                                                                         \
-		FORMAT_START_DIAG(clang) \
-		FORMAT_DIAG(clang, ignored "-Wc2y-extensions") \
+		FORMAT_START_DIAG(clang)                                                                 \
+		FORMAT_DIAG(clang, ignored "-Wc2y-extensions")                                           \
 		_Static_assert(__builtin_types_compatible_p(typeof(output), struct format_output*),      \
 		               "Invalid output type");                                                   \
 		_Static_assert(__builtin_types_compatible_p(typeof(fmt), const char*) ||                 \
@@ -359,7 +364,7 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 		    output,                                                                              \
 		    fmt,                                                                                 \
 		    (const struct fmt_env){ .args = args, .size = sizeof(args) / sizeof(args[0]) - 1 }); \
-		FORMAT_END_DIAG(clang) \
+		FORMAT_END_DIAG(clang)                                                                   \
 	} while (0)
 
 /** @} */
