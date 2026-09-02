@@ -6,6 +6,33 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Diagnostic helpers */
+#define FORMAT__DO_PRAGMA_(x) _Pragma(#x)
+#define FORMAT__DO_PRAGMA(x) FORMAT__DO_PRAGMA_(x)
+#if defined(__GNUC__) && !defined(__clang__)
+#define FORMAT__START_DIAG_gcc FORMAT__DO_PRAGMA(GCC diagnostic push)
+#define FORMAT__DIAG_gcc(diag) FORMAT__DO_PRAGMA(GCC diagnostic diag)
+#define FORMAT__END_DIAG_gcc FORMAT__DO_PRAGMA(GCC diagnostic pop)
+#else
+#define FORMAT__START_DIAG_gcc
+#define FORMAT__DIAG_gcc(diagnostic)
+#define FORMAT__END_DIAG_gcc
+#endif
+
+#if defined(__clang__)
+#define FORMAT__START_DIAG_clang FORMAT__DO_PRAGMA(clang diagnostic push)
+#define FORMAT__DIAG_clang(diag) FORMAT__DO_PRAGMA(clang diagnostic diag)
+#define FORMAT__END_DIAG_clang FORMAT__DO_PRAGMA(clang diagnostic pop)
+#else
+#define FORMAT__START_DIAG_clang
+#define FORMAT__DIAG_clang(diagnostic)
+#define FORMAT__END_DIAG_clang
+#endif
+
+#define FORMAT_START_DIAG(target) FORMAT__START_DIAG_##target
+#define FORMAT_DIAG(target, diagnostic) FORMAT__DIAG_##target(diagnostic)
+#define FORMAT_END_DIAG(target) FORMAT__END_DIAG_##target
+
 /** @brief Format style */
 enum format_output_style
 {
@@ -312,6 +339,8 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 
 #define format(output, fmt, ...)                                                                 \
 	do {                                                                                         \
+		FORMAT_START_DIAG(clang) \
+		FORMAT_DIAG(clang, ignored "-Wc2y-extensions") \
 		_Static_assert(__builtin_types_compatible_p(typeof(output), struct format_output*),      \
 		               "Invalid output type");                                                   \
 		_Static_assert(__builtin_types_compatible_p(typeof(fmt), const char*) ||                 \
@@ -330,6 +359,7 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 		    output,                                                                              \
 		    fmt,                                                                                 \
 		    (const struct fmt_env){ .args = args, .size = sizeof(args) / sizeof(args[0]) - 1 }); \
+		FORMAT_END_DIAG(clang) \
 	} while (0)
 
 /** @} */

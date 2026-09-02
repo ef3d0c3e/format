@@ -17,6 +17,7 @@ struct number_spec
 	 *  - `<`: Left (default)
 	 *  - `>`: Right
 	 *  - `^`: Center
+	 *  - `0`: Pad with `0`'s
 	 */
 	char align;
 	/**
@@ -28,8 +29,6 @@ struct number_spec
 	char sign;
 	/** @brief Alternate mode */
 	int alternate;
-	/** @brief Flag to force padding numbers with `0`'s */
-	int zero;
 	/** @brief Minimum field width */
 	size_t width;
 	/** @brief Field precision */
@@ -104,10 +103,10 @@ parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 			assert(size < env->size &&
 			       "Cannot reference element past the number of formatting arguments");
 		}
+		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
 		// TODO enforce variant
 		size = (size_t)env->args[size].data;
 		assert(size <= 16384 && "Size cannot exceed 16384");
-		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
 		++*i;
 	}
 	/* Literal */
@@ -127,6 +126,8 @@ parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env)
  * @param fmt_spec Format specifier
  * @param env Format environment
  *
+ * Format: `[align][sign][alternate][zero][width][precision]`
+ *
  * @return Parsed @ref number_spec for @p fmt_spec
  */
 static inline struct number_spec
@@ -134,12 +135,11 @@ parse_number_spec(const char* fmt_spec, const struct fmt_env* env)
 {
 	struct number_spec spec = {
 		.fill = { ' ', 0, 0, 0, 0 }, /* Space */
-		.align = '<',                /* Left */
+		.align = 0,
 		.sign = '-',                 /* Negative only */
 		.alternate = 0,
-		.zero = 0,
 		.width = 0,
-		.precision = 0,
+		.precision = -1,
 		.type = 0,
 		.left = fmt_spec,
 	};
@@ -175,9 +175,12 @@ parse_number_spec(const char* fmt_spec, const struct fmt_env* env)
 
 	/* Parse zero */
 	if (fmt_spec[i] == '0') {
-		spec.zero = 1;
+		assert(spec.align == 0 && "Conflicting alignment detected");
+		spec.align = '0';
 		++i;
 	}
+	if (spec.align == 0)
+		spec.align = '<'; /* Left-aligned by default */
 
 	/* Parse width */
 	spec.width = parse_number(fmt_spec, &i, env);
@@ -187,6 +190,7 @@ parse_number_spec(const char* fmt_spec, const struct fmt_env* env)
 		++i;
 		spec.precision = parse_number(fmt_spec, &i, env);
 	}
+	assert((spec.precision == -1 || spec.align != '0') && "Cannot use precision with 0-padding");
 
 	/* Parse type */
 	if (fmt_spec[i] != '}')
@@ -200,43 +204,62 @@ static inline int
 write_aligned(struct format_output* output,
               const struct number_spec* spec,
               const char* buf,
-              size_t len)
+              size_t len,
+              size_t num_len,
+              size_t zero_pos)
 {
-	/* Padding */
+	assert(zero_pos < len);
+
+	size_t digit_len = len - zero_pos;   /* natural digit byte count */
+	size_t precision_zeros = 0;
+	if (spec->precision != (size_t)-1) {
+		precision_zeros = spec->precision > num_len ? spec->precision - num_len : 0;
+		digit_len = num_len;              /* only actually emit num_len digit bytes */
+	}
+	const size_t content_len = zero_pos + precision_zeros + digit_len;
+
 	size_t right = 0, left = 0;
 	switch (spec->align) {
-		/* Center */
 		case '^':
-			right = spec->width / 2;
-			left = spec->width - right;
+			left = (spec->width > content_len ? spec->width - content_len : 0);
+			right = left / 2;
+			left -= right;
 			break;
-		/* Left */
 		case '<':
-			left = spec->width;
+			right = spec->width > content_len ? spec->width - content_len : 0;
 			break;
-		/* Right */
 		case '>':
-			right = spec->width;
+			left = spec->width > content_len ? spec->width - content_len : 0;
+			break;
+		case '0':
 			break;
 		default:
 			__builtin_unreachable();
 	}
 
-	/* Write */
 	const size_t fill_len = strnlen(spec->fill, 5);
-	if (right > len) /* Right */
-	{
-		for (size_t i = 0; i < right - len; ++i)
-		{
-			if (format_output_write(output, spec->fill, fill_len)) return -1;
-		}
+	for (size_t i = 0; i < left; ++i)
+		if (format_output_write(output, spec->fill, fill_len)) return -1;
+
+	if (spec->align == '0') {
+		if (format_output_write(output, buf, zero_pos)) return -1;
+		const size_t zero_count = spec->width > len ? (spec->width - len) : 0;
+		for (size_t i = 0; i < zero_count; ++i)
+			if (format_output_write(output, "0", 1)) return -1;
+		if (format_output_write(output, buf + zero_pos, len - zero_pos)) return -1;
 	}
-	if (format_output_write(output, buf, len)) return -1;
-	if (left > len) /* Left */
-	{
-		for (size_t i = 0; i < left - len; ++i)
-			if (format_output_write(output, spec->fill, fill_len)) return -1;
+	else if (spec->precision != (size_t)-1) {
+		if (format_output_write(output, buf, zero_pos)) return -1;
+		for (size_t i = 0; i < precision_zeros; ++i)
+			if (format_output_write(output, "0", 1)) return -1;
+		if (format_output_write(output, buf + zero_pos, digit_len)) return -1;
 	}
+	else {
+		if (format_output_write(output, buf, len)) return -1;
+	}
+
+	for (size_t i = 0; i < right; ++i)
+		if (format_output_write(output, spec->fill, fill_len)) return -1;
 	return 0;
 }
 
@@ -248,8 +271,6 @@ format_fmt_long(struct format_output* output,
 {
 	struct number_spec spec = parse_number_spec(fmt_spec, env);
 
-	assert(spec.zero == 0);
-	assert(spec.precision == 0 && "Unsupported precision");
 	assert(strchr("xXbB", spec.type) != NULL && "Invalid display type");
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
@@ -258,7 +279,7 @@ format_fmt_long(struct format_output* output,
 
 	/* Get base */
 	const int base = (tolower(spec.type) == 'x') ? 16 : (tolower(spec.type) == 'b') ? 2 : 10;
-	if (base != 10 && val < 0)
+	if (base != 10)
 		return format_fmt_unsigned_long(output, fmt_spec, env, idx);
 
 	/* Compute length in base */
@@ -267,15 +288,18 @@ format_fmt_long(struct format_output* output,
 		++len;
 	if (val == 0)
 		len = 1;
+	const size_t num_len = (val == 0 && spec.precision == 0) ? 0 : len;
 
 	/* Sign */
 	size_t start = 0;
-	if (spec.sign != '-') {
-		++len;
-		buf[start++] = spec.sign == '+' ? '+' : ' ';
-	} else if (val < 0) {
+	if (val < 0)
+	{
 		++len;
 		buf[start++] = '-';
+	}
+	else if (spec.sign != '-') {
+		++len;
+		buf[start++] = spec.sign == '+' ? '+' : ' ';
 	}
 
 	/* Prefix */
@@ -307,7 +331,7 @@ format_fmt_long(struct format_output* output,
 		}
 	}
 
-	return write_aligned(output, &spec, buf, len);
+	return write_aligned(output, &spec, buf, len, num_len, start);
 }
 
 int
@@ -318,8 +342,6 @@ format_fmt_unsigned_long(struct format_output* output,
 {
 	struct number_spec spec = parse_number_spec(fmt_spec, env);
 
-	assert(spec.zero == 0);
-	assert(spec.precision == 0 && "Unsupported precision");
 	assert(strchr("xXbB", spec.type) != NULL && "Invalid display type");
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
@@ -335,13 +357,9 @@ format_fmt_unsigned_long(struct format_output* output,
 		++len;
 	if (val == 0)
 		len = 1;
+	const size_t num_len = (val == 0 && spec.precision == 0) ? 0 : len;
 
-	/* Sign */
 	size_t start = 0;
-	if (spec.sign != '-') {
-		++len;
-		buf[start++] = spec.sign == '+' ? '+' : ' ';
-	}
 
 	/* Prefix */
 	if (spec.alternate && spec.type != '\0' && val != 0) {
@@ -372,5 +390,15 @@ format_fmt_unsigned_long(struct format_output* output,
 		}
 	}
 
-	return write_aligned(output, &spec, buf, len);
+	return write_aligned(output, &spec, buf, len, num_len, start);
+}
+
+int
+format_fmt_int(struct format_output* output,
+                const char* fmt_spec,
+                const struct fmt_env* env,
+                size_t idx)
+{
+	assert(0 && "TODO");
+	return 0;
 }
