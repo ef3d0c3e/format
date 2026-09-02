@@ -251,7 +251,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 		assert(output->file == NULL && output->fd == -1);
 
 		/* Compute new capacity */
-		size_t new_cap = output->capacity;
+		size_t new_cap = output->capacity ? output->capacity : 1;
 		while (new_cap < output->size + len) {
 			new_cap *= 2;
 		}

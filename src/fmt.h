@@ -4,6 +4,4 @@
 #include "buffer.h"
 #include <assert.h>
 
-
-
 #endif // LIBFORMAT_FMT_H

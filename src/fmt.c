@@ -258,6 +258,8 @@ format_fmt_long(struct format_output* output,
 
 	/* Get base */
 	const int base = (tolower(spec.type) == 'x') ? 16 : (tolower(spec.type) == 'b') ? 2 : 10;
+	if (base != 10 && val < 0)
+		return format_fmt_unsigned_long(output, fmt_spec, env, idx);
 
 	/* Compute length in base */
 	size_t len = 0;
@@ -271,10 +273,13 @@ format_fmt_long(struct format_output* output,
 	if (spec.sign != '-') {
 		++len;
 		buf[start++] = spec.sign == '+' ? '+' : ' ';
+	} else if (val < 0) {
+		++len;
+		buf[start++] = '-';
 	}
 
 	/* Prefix */
-	if (spec.alternate && spec.type != '\0') {
+	if (spec.alternate && spec.type != '\0' && val != 0) {
 		buf[start++] = '0';
 		buf[start++] = spec.type;
 		len += 2;
@@ -286,14 +291,79 @@ format_fmt_long(struct format_output* output,
 	else {
 		long x = val;
 		for (size_t i = 0; x; ++i) {
+			const int d = val >= 0 ? (int)(x % base) : -(int)(x % base);
+			x /= base;
+			switch (spec.type) {
+				case 'x':
+					buf[len - i - 1] = "0123456789abcdef"[d];
+					break;
+				case 'X':
+					buf[len - i - 1] = "0123456789ABCDEF"[d];
+					break;
+				default:
+					buf[len - i - 1] = (char)('0' + d);
+					break;
+			}
+		}
+	}
+
+	return write_aligned(output, &spec, buf, len);
+}
+
+int
+format_fmt_unsigned_long(struct format_output* output,
+                const char* fmt_spec,
+                const struct fmt_env* env,
+                size_t idx)
+{
+	struct number_spec spec = parse_number_spec(fmt_spec, env);
+
+	assert(spec.zero == 0);
+	assert(spec.precision == 0 && "Unsupported precision");
+	assert(strchr("xXbB", spec.type) != NULL && "Invalid display type");
+	assert(spec.left[0] == '}' && "Leftover content in format specifier");
+
+	const unsigned long val = (unsigned long)env->args[idx].data;
+	char buf[sizeof(long) * 8 + 16];
+
+	/* Get base */
+	const unsigned long base = (tolower(spec.type) == 'x') ? 16 : (tolower(spec.type) == 'b') ? 2 : 10;
+
+	/* Compute length in base */
+	size_t len = 0;
+	for (unsigned long x = val; x; x /= base)
+		++len;
+	if (val == 0)
+		len = 1;
+
+	/* Sign */
+	size_t start = 0;
+	if (spec.sign != '-') {
+		++len;
+		buf[start++] = spec.sign == '+' ? '+' : ' ';
+	}
+
+	/* Prefix */
+	if (spec.alternate && spec.type != '\0' && val != 0) {
+		buf[start++] = '0';
+		buf[start++] = spec.type;
+		len += 2;
+	}
+
+	/* Value */
+	if (val == 0)
+		buf[start] = '0';
+	else {
+		unsigned long x = val;
+		for (size_t i = 0; x; ++i) {
 			const int d = (int)(x % base);
 			x /= base;
 			switch (spec.type) {
 				case 'x':
-					buf[len - i - 1] = "01234567489abcdef"[d];
+					buf[len - i - 1] = "0123456789abcdef"[d];
 					break;
 				case 'X':
-					buf[len - i - 1] = "01234567489ABCDEF"[d];
+					buf[len - i - 1] = "0123456789ABCDEF"[d];
 					break;
 				default:
 					buf[len - i - 1] = (char)('0' + d);
