@@ -213,9 +213,11 @@ do { \
 #define CONCAT_(x, y) x ## y
 #define CONCAT(x, y) CONCAT_(x, y)
 
-#define for_each(type_, varname_, ...) \
-	const type_ CONCAT(varname_, array_)[] = {__VA_ARGS__}; \
-	type_ varname_ = CONCAT(varname_, array_)[0]; \
-	for (size_t idx_ = 0; idx_ < sizeof(CONCAT(varname_, array_)) / sizeof(type_); varname_ = CONCAT(varname_, array_)[++idx_])
+#define for_each__(id_, type_, varname_, ...) \
+	type_ CONCAT(foreach_array_, id_)[] = {__VA_ARGS__}; \
+	type_ varname_ = CONCAT(foreach_array_, id_)[0]; \
+	for (size_t idx_ = 0; idx_ < sizeof(CONCAT(foreach_array_, id_)) / sizeof(type_); varname_ = CONCAT(foreach_array_, id_)[++idx_])
+#define for_each_(id_, type_, varname_, ...) for_each__(id_, type_, varname_, __VA_ARGS__)
+#define for_each(type_, varname_, ...) for_each_(__COUNTER__, type_, varname_, __VA_ARGS__)
 	
 #endif // FORMAT_TESTS_UTIL_H

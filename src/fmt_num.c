@@ -3,8 +3,8 @@
 /** @brief Number format spec */
 struct number_spec
 {
-	/** @brief Fill character (codepoint) */
-	char fill[5];
+	/** @brief Fill string */
+	struct spec_placeholder fill;
 	/**
 	 * @brief Alignment character:
 	 *  - `<`: Left (default)
@@ -60,17 +60,7 @@ parse_number_spec(const char* fmt_spec, const struct fmt_env* env)
 
 	size_t i = 0;
 	/* Parse align */
-	const size_t len = utf8_len(fmt_spec, 5); /* Get the width of the alignment character codepoint */
-	assert(len <= 5);
-	if (strchr("<>^", fmt_spec[len])) /* Custom character */
-	{
-		spec.align = fmt_spec[len];
-		strncpy((char*)spec.fill, fmt_spec, len);
-		i = len + 1;
-	} else if (strchr("<>^", fmt_spec[i])) /* Default character */
-	{
-		spec.align = fmt_spec[i++];
-	}
+	parse_alignment(fmt_spec, &i, env, &spec.align, &spec.fill, " ");
 
 	/* Parse sign */
 	if (strchr("-+ ", fmt_spec[i]))
@@ -160,10 +150,8 @@ write_aligned(struct format_output* output,
 			__builtin_unreachable();
 	}
 
-	const size_t fill_len = strnlen(spec->fill, 5);
-	for (size_t i = 0; i < left; ++i)
-		if (format_output_write(output, spec->fill, fill_len))
-			return -1;
+	if (write_placeholder(output, &spec->fill, left))
+		return -1;
 
 	if (spec->align == '0') {
 		if (format_output_write(output, buf, zero_pos))
@@ -187,9 +175,8 @@ write_aligned(struct format_output* output,
 			return -1;
 	}
 
-	for (size_t i = 0; i < right; ++i)
-		if (format_output_write(output, spec->fill, fill_len))
-			return -1;
+	if (write_placeholder(output, &spec->fill, right))
+		return -1;
 	return 0;
 }
 

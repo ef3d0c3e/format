@@ -28,6 +28,18 @@ utf8_len(const char* str, size_t len)
 }
 
 size_t
+utf8_len_str(const char* str, size_t len)
+{
+	size_t u8len = 0;
+	for (size_t i = 0; i < len;) {
+		const size_t cp = utf8_len(str, len - i);
+		i += cp;
+		++u8len;
+	}
+	return u8len;
+}
+
+size_t
 parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 {
 	size_t size = 0;
@@ -42,10 +54,10 @@ parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 			       "Cannot reference element past the number of formatting arguments");
 		}
 		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
+		++*i;
 		// TODO enforce variant
 		size = (size_t)env->args[size].data;
 		assert(size <= 16384 && "Size cannot exceed 16384");
-		++*i;
 	}
 	/* Literal */
 	else if (isdigit(fmt_spec[*i])) {
@@ -56,4 +68,143 @@ parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 		}
 	}
 	return size;
+}
+
+struct spec_placeholder
+parse_placeholder(const char* fmt_spec, size_t* i, const struct fmt_env* env)
+{
+	struct spec_placeholder placeholder;
+	/* Parse from arg list */
+	if (fmt_spec[*i] == '{') {
+		placeholder.type = 1;
+		++*i;
+		assert(isdigit(fmt_spec[*i]));
+		size_t id = 0;
+		while (isdigit(fmt_spec[*i])) {
+			id = id * 10 + (size_t)(fmt_spec[*i] - '0');
+			++*i;
+			assert(id < env->size &&
+			       "Cannot reference element past the number of formatting arguments");
+		}
+		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
+		++*i;
+		placeholder.str = (const char*)env->args[id].data;
+		placeholder.len = strlen(placeholder.str);
+		placeholder.width = utf8_len_str(placeholder.str, placeholder.len);
+		return placeholder;
+	}
+
+	/* Literal, single codepoint only */
+	assert(fmt_spec[*i] != '}' && "Expected placeholder");
+	const size_t len = utf8_len(fmt_spec + *i, 5);
+	assert(len <= 5);
+
+	placeholder.type = 0;
+	memset(placeholder.codepoint, 0, sizeof placeholder.codepoint);
+	placeholder.codepoint[0] = '\0';
+	memcpy(placeholder.codepoint, fmt_spec + *i, len);
+	placeholder.len = strlen(placeholder.codepoint);
+	placeholder.width = utf8_len_str(placeholder.codepoint, placeholder.len);
+	*i += len;
+	return placeholder;
+}
+
+int
+write_placeholder(struct format_output* output,
+                  const struct spec_placeholder* placeholder,
+                  size_t max_width)
+{
+	/* Write codepoint */
+	if (placeholder->type == 0)
+	{
+		if (max_width == (size_t)-1)
+			max_width = 1;
+		/* Width is always 1 */
+		for (size_t i = 0; i < max_width; ++i)
+		{
+			if (format_output_write(output,
+						placeholder->codepoint,
+						placeholder->len))
+				return -1;
+		}
+		return 0;
+	}
+
+	/* Write string content entirely exactly once */
+	if (max_width == (size_t)-1)
+	{
+		return format_output_write(output,
+					placeholder->str,
+					placeholder->len);
+	}
+
+	size_t width = 0;
+	size_t i = 0;
+	while (width < max_width)
+	{
+		if (i >= placeholder->len)
+			i = 0;
+
+		const size_t cp = utf8_len(placeholder->str + i, placeholder->len - i);
+		if (cp == 0)
+		{
+			++i;
+			continue;
+		}
+
+		if (format_output_write(output,
+					placeholder->str + i,
+					cp))
+			return -1;
+		i += cp;
+		++width;
+	}
+	return 0;
+}
+
+void
+parse_alignment(const char* fmt_spec,
+                size_t* i,
+                const struct fmt_env* env,
+                char* alignment,
+                struct spec_placeholder* fill,
+                const char* default_placeholder)
+{
+	do {
+		/* <align> : parse and return directly */
+		if (strchr("<>^", fmt_spec[*i])) {
+			*alignment = fmt_spec[*i];
+			++*i;
+			break;
+		}
+		/* {N}<align> */
+		else if (fmt_spec[*i] == '{') {
+			size_t j = *i + 1;
+			while (isdigit(fmt_spec[j])) {
+				++j;
+			}
+			if (fmt_spec[j] != '}')
+				break;
+			++j;
+			if (!strchr("<>^", fmt_spec[j]))
+				break;
+		}
+		/* <codepoint><align> */
+		else {
+			const size_t len = utf8_len(fmt_spec + *i, 5);
+			if ((len == 1 && fmt_spec[*i] == '#') || !strchr("<>^", fmt_spec[*i + len]))
+				break;
+		}
+
+		/* Parse placeholder + alignment */
+		*fill = parse_placeholder(fmt_spec, i, env);
+		assert(strchr("<>^", fmt_spec[*i]));
+		*alignment = fmt_spec[*i];
+		++*i;
+		return;
+	} while (0);
+	fill->type = 1;
+	fill->str = default_placeholder;
+	fill->len = strlen(fill->str);
+	fill->width = utf8_len_str(fill->str, fill->len);
 }

@@ -16,6 +16,29 @@
 #define FORMAT_HEX "0123456789abcdef"
 #define FORMAT_HEX_CAPITAL "0123456789ABCDEF"
 
+/** @brief Represent a placeholder character */
+struct spec_placeholder {
+	/**
+	 * @brief Placeholder type
+	 *  - `0`: Codepoint
+	 *  - `1`: String
+	 */
+	int type;
+	union {
+		char codepoint[5];
+		const char* str;
+	};
+	/** @brief Number of bytes in the string (strlen) */
+	size_t len;
+	/** @brief Number of codepoints in the string */
+	size_t width;
+};
+
+int
+write_placeholder(struct format_output* output,
+                  const struct spec_placeholder* placeholder,
+                  size_t max_width);
+
 /**
  * @brief Compute the length of a unicode codepoint
  *
@@ -45,5 +68,11 @@ utf8_len(const char* str, size_t len);
  */
 size_t
 parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env);
+
+struct spec_placeholder
+parse_placeholder(const char *fmt_spec, size_t *i, const struct fmt_env *env);
+
+void
+parse_alignment(const char *fmt_spec, size_t *i, const struct fmt_env *env, char *alignment, struct spec_placeholder* fill, const char *default_placeholder);
 
 #endif // LIBFORMAT_FMT_H
