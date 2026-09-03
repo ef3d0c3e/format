@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define FORMAT_HEX "0123456789abcdef"
+#define FORMAT_HEX_CAPITAL "0123456789ABCDEF"
+
 /**
  * @brief Compute the length of a unicode codepoint
  *

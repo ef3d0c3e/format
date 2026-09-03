@@ -333,6 +333,13 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 		_Static_assert(sizeof(typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))) <= sizeof(uint64_t), \
 		               "Invalid argument type");                                                 \
 		if (__builtin_types_compatible_p(const void*,                                            \
+		                                 typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))) ||        \
+		    __builtin_types_compatible_p(char*, typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))) || \
+		    __builtin_types_compatible_p(const char*,                                            \
+		                                 typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))) ||        \
+		    __builtin_types_compatible_p(char[],                                                 \
+		                                 typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))) ||        \
+		    __builtin_types_compatible_p(const char[],                                           \
 		                                 typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG))))) {        \
 			args[N].data = (uintptr_t)FMT__SELECT(1, FMT__ARG_EXPAND(ARG));                      \
 		} else {                                                                                 \

@@ -725,3 +725,8 @@ Test(fmt_long, bad_spec_ref_missing_brace, .signal = SIGABRT) {
 	 * the "Expected `}' after number" check instead. */
 	format(&out, "{0:{1x}}", 1L, 2L);
 }
+
+Test(fmt_long, bad_spec_invalid_display_type, .signal = SIGABRT) {
+	struct format_output out = format_output_buf();
+	format(&out, "{0:c}", 1L);
+}

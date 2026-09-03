@@ -58,12 +58,9 @@ parse_number_spec(const char* fmt_spec, const struct fmt_env* env)
 	if (*fmt_spec == '}')
 		return spec;
 
-	assert(strchr(fmt_spec, '}') != NULL &&
-	       "Expected `}'"); // TODO: Redundant, should be asserted before calling this
-
 	size_t i = 0;
 	/* Parse align */
-	const size_t len = utf8_len(fmt_spec, 5); /* Get width of the alignment character codepoint */
+	const size_t len = utf8_len(fmt_spec, 5); /* Get the width of the alignment character codepoint */
 	assert(len <= 5);
 	if (strchr("<>^", fmt_spec[len])) /* Custom character */
 	{
@@ -107,7 +104,10 @@ parse_number_spec(const char* fmt_spec, const struct fmt_env* env)
 
 	/* Parse type */
 	if (fmt_spec[i] != '}')
+	{
 		spec.type = fmt_spec[i++];
+		assert(strchr("xXbB", spec.type) && "Invalid display type");
+	}
 
 	spec.left = fmt_spec + i;
 	return spec;
@@ -141,7 +141,7 @@ write_aligned(struct format_output* output,
 	}
 	const size_t content_len = zero_pos + precision_zeros + digit_len;
 
-	size_t right = 0, left = 0;
+	size_t left = 0, right = 0;
 	switch (spec->align) {
 		case '^':
 			left = (spec->width > content_len ? spec->width - content_len : 0);
@@ -196,8 +196,6 @@ write_aligned(struct format_output* output,
 #define format_unsigned_value(type__)                                                            \
 	do {                                                                                         \
 		struct number_spec spec = parse_number_spec(fmt_spec, env);                              \
-                                                                                                 \
-		assert(strchr("xXbB", spec.type) != NULL && "Invalid display type");                     \
 		assert(spec.left[0] == '}' && "Leftover content in format specifier");                   \
                                                                                                  \
 		const type__ val = (type__)env->args[idx].data;                                          \
@@ -235,10 +233,10 @@ write_aligned(struct format_output* output,
 				x /= base;                                                                       \
 				switch (spec.type) {                                                             \
 					case 'x':                                                                    \
-						buf[len - i - 1] = "0123456789abcdef"[d];                                \
+						buf[len - i - 1] = FORMAT_HEX[d];                                \
 						break;                                                                   \
 					case 'X':                                                                    \
-						buf[len - i - 1] = "0123456789ABCDEF"[d];                                \
+						buf[len - i - 1] = FORMAT_HEX_CAPITAL[d];                                \
 						break;                                                                   \
 					default:                                                                     \
 						buf[len - i - 1] = (char)('0' + d);                                      \
@@ -253,8 +251,6 @@ write_aligned(struct format_output* output,
 #define format_signed_value(type__, unsigned_type__)                                             \
 	do {                                                                                         \
 		struct number_spec spec = parse_number_spec(fmt_spec, env);                              \
-                                                                                                 \
-		assert(strchr("xXbB", spec.type) != NULL && "Invalid display type");                     \
 		assert(spec.left[0] == '}' && "Leftover content in format specifier");                   \
                                                                                                  \
 		const type__ val = (type__)env->args[idx].data;                                          \
@@ -303,10 +299,10 @@ write_aligned(struct format_output* output,
 				x /= base;                                                                       \
 				switch (spec.type) {                                                             \
 					case 'x':                                                                    \
-						buf[len - i - 1] = "0123456789abcdef"[d];                                \
+						buf[len - i - 1] = FORMAT_HEX[d];                                \
 						break;                                                                   \
 					case 'X':                                                                    \
-						buf[len - i - 1] = "0123456789ABCDEF"[d];                                \
+						buf[len - i - 1] = FORMAT_HEX_CAPITAL[d];                                \
 						break;                                                                   \
 					default:                                                                     \
 						buf[len - i - 1] = (char)('0' + d);                                      \
