@@ -88,6 +88,7 @@ format_fmt_str(struct format_output* output,
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
 	const char* val = (const char*)env->args[idx].data;
+	assert(val != NULL && "Cannot format a NULL string");
 
 	/* Number of bytes to display */
 	size_t len = 0;
@@ -134,11 +135,11 @@ format_fmt_str(struct format_output* output,
 	}
 
 	/* Left spacing */
-	if (write_placeholder(output, &spec.fill, left))
+	if (write_placeholder(output, &spec.fill, left, 0))
 		return -1;
 	/* Left quote */
 	if (spec.quoted) {
-		if (write_placeholder(output, &spec.left_quote, (size_t)-1))
+		if (write_placeholder(output, &spec.left_quote, (size_t)-1, 0))
 			return -1;
 	}
 
@@ -215,11 +216,11 @@ format_fmt_str(struct format_output* output,
 
 	/* Right quote */
 	if (spec.quoted) {
-		if (write_placeholder(output, &spec.right_quote, (size_t)-1))
+		if (write_placeholder(output, &spec.right_quote, (size_t)-1, 0))
 			return -1;
 	}
 	/* Right spacing */
-	if (write_placeholder(output, &spec.fill, right))
+	if (write_placeholder(output, &spec.fill, right, 1))
 		return -1;
 
 	return 0;

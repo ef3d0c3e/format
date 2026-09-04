@@ -37,7 +37,8 @@ struct spec_placeholder {
 int
 write_placeholder(struct format_output* output,
                   const struct spec_placeholder* placeholder,
-                  size_t max_width);
+                  size_t max_width,
+				  int reverse);
 
 /**
  * @brief Compute the length of a unicode codepoint

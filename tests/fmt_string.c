@@ -154,10 +154,31 @@ Test(fmt_string, quotes) {
 #undef test
 }
 
+Test(fmt_string, fill) {
+	test_manual("|{:{1}<20}|", "|hello. . . . . . . .|", "hello", " .");
+	test_manual("|{:{1}<20}|", "|hello2 . . . . . . .|", "hello2", " .");
 
-Test(fmt_string, temp) {
-	struct format_output out = format_output_file(stdout);
-	format(&out, "|{:{1}<20}|\n", "hello", " .");
-	format(&out, "|{:{1}<20#{2}'}|\n", "hello", " .", "TEST");
+	test_manual("|{:{1}^20}|", "| . . . .hello. . . .|", "hello", " .");
+	test_manual("|{:{1}^20}|", "| . . . hello2. . . .|", "hello2", " .");
+	
+	test_manual("|{:{1}>20}|", "| . . . . . . . hello|", "hello", " .");
+	test_manual("|{:{1}>20}|", "| . . . . . . .hello2|", "hello2", " .");
+
+	test_manual("|{:{1}<20}|", "|hello⨘ ⨘ ⨘ ⨘ ⨘ ⨘ ⨘ ⨘|", "hello", " ⨘");
+	test_manual("|{:{1}<20}|", "|hello2 ⨘ ⨘ ⨘ ⨘ ⨘ ⨘ ⨘|", "hello2", " ⨘");
+
+	test_manual("|{:{1}^20}|", "| ⨘ ⨘ ⨘ ⨘hello⨘ ⨘ ⨘ ⨘|", "hello", " ⨘");
+	test_manual("|{:{1}^20}|", "| ⨘ ⨘ ⨘ hello2⨘ ⨘ ⨘ ⨘|", "hello2", " ⨘");
+	
+	test_manual("|{:{1}>20}|", "| ⨘ ⨘ ⨘ ⨘ ⨘ ⨘ ⨘ hello|", "hello", " ⨘");
+	test_manual("|{:{1}>20}|", "| ⨘ ⨘ ⨘ ⨘ ⨘ ⨘ ⨘hello2|", "hello2", " ⨘");
+
+	test_manual("|{:{1}<20}|", "|hello🎅 🎅 🎅 🎅 🎅 🎅 🎅 🎅|", "hello", " 🎅");
+	test_manual("|{:{1}<20}|", "|hello2 🎅 🎅 🎅 🎅 🎅 🎅 🎅|", "hello2", " 🎅");
+
+	test_manual("|{:{1}^20}|", "| 🎅 🎅 🎅 🎅hello🎅 🎅 🎅 🎅|", "hello", " 🎅");
+	test_manual("|{:{1}^20}|", "| 🎅 🎅 🎅 hello2🎅 🎅 🎅 🎅|", "hello2", " 🎅");
+	
+	test_manual("|{:{1}>20}|", "| 🎅 🎅 🎅 🎅 🎅 🎅 🎅 hello|", "hello", " 🎅");
+	test_manual("|{:{1}>20}|", "| 🎅 🎅 🎅 🎅 🎅 🎅 🎅hello2|", "hello2", " 🎅");
 }
-

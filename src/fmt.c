@@ -32,7 +32,7 @@ utf8_len_str(const char* str, size_t len)
 {
 	size_t u8len = 0;
 	for (size_t i = 0; i < len;) {
-		const size_t cp = utf8_len(str, len - i);
+		const size_t cp = utf8_len(str + i, len - i);
 		i += cp;
 		++u8len;
 	}
@@ -112,52 +112,62 @@ parse_placeholder(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 int
 write_placeholder(struct format_output* output,
                   const struct spec_placeholder* placeholder,
-                  size_t max_width)
+                  size_t max_width,
+                  int reverse)
 {
 	/* Write codepoint */
-	if (placeholder->type == 0)
-	{
+	if (placeholder->type == 0) {
 		if (max_width == (size_t)-1)
 			max_width = 1;
 		/* Width is always 1 */
-		for (size_t i = 0; i < max_width; ++i)
-		{
-			if (format_output_write(output,
-						placeholder->codepoint,
-						placeholder->len))
+		for (size_t i = 0; i < max_width; ++i) {
+			if (format_output_write(output, placeholder->codepoint, placeholder->len))
 				return -1;
 		}
 		return 0;
 	}
 
 	/* Write string content entirely exactly once */
-	if (max_width == (size_t)-1)
-	{
-		return format_output_write(output,
-					placeholder->str,
-					placeholder->len);
+	if (max_width == (size_t)-1) {
+		return format_output_write(output, placeholder->str, placeholder->len);
 	}
 
-	size_t width = 0;
-	size_t i = 0;
-	while (width < max_width)
-	{
-		if (i >= placeholder->len)
-			i = 0;
+	if (placeholder->width == 0 || max_width == 0)
+		return 0;
 
-		const size_t cp = utf8_len(placeholder->str + i, placeholder->len - i);
-		if (cp == 0)
-		{
-			++i;
-			continue;
+	const size_t full_cycles = max_width / placeholder->width;
+	const size_t remainder = max_width % placeholder->width;
+
+	if (reverse) {
+		if (remainder > 0) {
+			size_t skip = placeholder->width - remainder;
+			size_t off = 0, cps = 0;
+			while (cps < skip && off < placeholder->len) {
+				const size_t cp = utf8_len(placeholder->str + off, placeholder->len - off);
+				off += cp ? cp : 1;
+				++cps;
+			}
+			if (format_output_write(output, placeholder->str + off, placeholder->len - off))
+				return -1;
 		}
+		for (size_t i = 0; i < full_cycles; ++i)
+			if (format_output_write(output, placeholder->str, placeholder->len))
+				return -1;
+		return 0;
+	}
 
-		if (format_output_write(output,
-					placeholder->str + i,
-					cp))
+	for (size_t i = 0; i < full_cycles; ++i)
+		if (format_output_write(output, placeholder->str, placeholder->len))
 			return -1;
-		i += cp;
-		++width;
+	if (remainder > 0) {
+		size_t off = 0, cps = 0;
+		while (cps < remainder && off < placeholder->len) {
+			const size_t cp = utf8_len(placeholder->str + off, placeholder->len - off);
+			off += cp ? cp : 1;
+			++cps;
+		}
+		if (format_output_write(output, placeholder->str, off))
+			return -1;
 	}
 	return 0;
 }

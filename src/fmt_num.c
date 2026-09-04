@@ -150,7 +150,7 @@ write_aligned(struct format_output* output,
 			__builtin_unreachable();
 	}
 
-	if (write_placeholder(output, &spec->fill, left))
+	if (write_placeholder(output, &spec->fill, left, 0))
 		return -1;
 
 	if (spec->align == '0') {
@@ -175,7 +175,7 @@ write_aligned(struct format_output* output,
 			return -1;
 	}
 
-	if (write_placeholder(output, &spec->fill, right))
+	if (write_placeholder(output, &spec->fill, right, 1))
 		return -1;
 	return 0;
 }

@@ -180,9 +180,9 @@ Test(fmt_unsigne_long, align) {
 
 	test_manual("{:{1}<1}", "0", 0UL, ". ");
 	test_manual("{:{1}<5}", "0. . ", 0UL, ". ");
-	test_manual("{:{1}<10}", "0. . . . .", 0UL, ". ");
+	test_manual("{:{1}<10}", "0 . . . . ", 0UL, ". ");
 	test_manual("{:{1}<15}", "0. . . . . . . ", 0UL, ". ");
-	test_manual("{:{1}<20}", "0. . . . . . . . . .", 0UL, ". ");
+	test_manual("{:{1}<20}", "0 . . . . . . . . . ", 0UL, ". ");
 
 	test_manual("{:~^1}", "0", 0UL);
 	test_manual("{:~^5}", "~~0~~", 0UL);
