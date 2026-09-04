@@ -7,31 +7,31 @@
 #include <string.h>
 
 /* Diagnostic helpers */
-#define FORMAT__DO_PRAGMA_(x) _Pragma(#x)
-#define FORMAT__DO_PRAGMA(x) FORMAT__DO_PRAGMA_(x)
+#define FORMAT___DO_PRAGMA_(x) _Pragma(#x)
+#define FORMAT___DO_PRAGMA(x) FORMAT___DO_PRAGMA_(x)
 #if defined(__GNUC__) && !defined(__clang__)
-#define FORMAT__START_DIAG_gcc FORMAT__DO_PRAGMA(GCC diagnostic push)
-#define FORMAT__DIAG_gcc(diag) FORMAT__DO_PRAGMA(GCC diagnostic diag)
-#define FORMAT__END_DIAG_gcc FORMAT__DO_PRAGMA(GCC diagnostic pop)
+#define FORMAT___START_DIAG_gcc FORMAT___DO_PRAGMA(GCC diagnostic push)
+#define FORMAT___DIAG_gcc(diag) FORMAT___DO_PRAGMA(GCC diagnostic diag)
+#define FORMAT___END_DIAG_gcc FORMAT___DO_PRAGMA(GCC diagnostic pop)
 #else
-#define FORMAT__START_DIAG_gcc
-#define FORMAT__DIAG_gcc(diagnostic)
-#define FORMAT__END_DIAG_gcc
+#define FORMAT___START_DIAG_gcc
+#define FORMAT___DIAG_gcc(diagnostic)
+#define FORMAT___END_DIAG_gcc
 #endif
 
 #if defined(__clang__)
-#define FORMAT__START_DIAG_clang FORMAT__DO_PRAGMA(clang diagnostic push)
-#define FORMAT__DIAG_clang(diag) FORMAT__DO_PRAGMA(clang diagnostic diag)
-#define FORMAT__END_DIAG_clang FORMAT__DO_PRAGMA(clang diagnostic pop)
+#define FORMAT___START_DIAG_clang FORMAT___DO_PRAGMA(clang diagnostic push)
+#define FORMAT___DIAG_clang(diag) FORMAT___DO_PRAGMA(clang diagnostic diag)
+#define FORMAT___END_DIAG_clang FORMAT___DO_PRAGMA(clang diagnostic pop)
 #else
-#define FORMAT__START_DIAG_clang
-#define FORMAT__DIAG_clang(diagnostic)
-#define FORMAT__END_DIAG_clang
+#define FORMAT___START_DIAG_clang
+#define FORMAT___DIAG_clang(diagnostic)
+#define FORMAT___END_DIAG_clang
 #endif
 
-#define FORMAT_START_DIAG(target) FORMAT__START_DIAG_##target
-#define FORMAT_DIAG(target, diagnostic) FORMAT__DIAG_##target(diagnostic)
-#define FORMAT_END_DIAG(target) FORMAT__END_DIAG_##target
+#define FORMAT__START_DIAG(target) FORMAT___START_DIAG_##target
+#define FORMAT__DIAG(target, diagnostic) FORMAT___DIAG_##target(diagnostic)
+#define FORMAT__END_DIAG(target) FORMAT___END_DIAG_##target
 
 /** @brief Format style */
 enum format_output_style
@@ -74,20 +74,93 @@ struct format_output;
 struct fmt_env
 {
 	/** @brief Stack allocated array of arguments */
-	struct fmt_arg* args;
+	struct format_arg* args;
 	/** @brief Number of arguments */
 	size_t size;
 };
 
-struct fmt_arg
+struct fmt_format_collection
 {
-	/** @brief Custom formatter */
-	int (*formatter)(struct format_output* output,
-	                 const char* fmt_spec,
-	                 const struct fmt_env*,
-	                 size_t idx);
-	/** @brief Raw data */
+	/** @brief Opaque iterator state, managed by the caller */
+	void* state;
+	/** @brief Get the next element in the collection, NULL when exhausted */
+	void* (*next)(struct fmt_format_collection* collection);
+	size_t (*width)(struct fmt_format_collection* collection, const char* fmt, size_t n);
+	/** @brief Formatter for elements in the collection */
+	int (*formatter)(struct format_output*, const char*, const struct fmt_env*, size_t);
+	/** @brief sizeof( element ) */
+	size_t elem_size;
+	int is_pointer;
+};
+
+/** @brief Type of format argument */
+enum fmt_arg_type
+{
+	/** @brief Single value */
+	kFormatScalar,
+	/** @brief Collection of values */
+	kFormatCollection,
+};
+
+/**
+ * @class format_arg
+ * @brief Individual format argument
+ */
+struct format_arg
+{
+	/** @brief Type of format argument */
+	enum fmt_arg_type type;
+	union
+	{
+		/** @brief Formatter */
+		int (*formatter)(struct format_output* output,
+		                 const char* fmt_spec,
+		                 const struct fmt_env*,
+		                 size_t idx);
+		/** @brief Collector accessor */
+		struct fmt_format_collection collection;
+	};
+	/** @brief Raw data, value to format */
 	uintptr_t data;
+};
+
+/**
+ * @defgroup Output Output buffer
+ * @{
+ */
+
+struct format_output
+{
+	// Style + Color
+	/** @brief Foreground color */
+	format_color fg;
+	/** @brief Background color */
+	format_color bg;
+	/** @brief Output style */
+	enum format_output_style style;
+
+	// Output data
+	/** @brief Output file descriptor, `-1` for none */
+	int fd;
+	/** @brief Stdio `FILE` output, `NULL` for none */
+	FILE* file;
+	/** @brief Flushing mode */
+	enum format_output_flush_mode flush_mode;
+
+	// Output buffer
+	/** @brief Buffer data */
+	char* data;
+	/** @brief Buffer size */
+	size_t size;
+	/** @brief Buffer allocated capacity */
+	size_t capacity;
+
+	// Allocators
+	void* (*malloc)(size_t);
+	void (*free)(void*, size_t);
+	void* (*realloc)(void*, size_t, size_t);
+
+	// TODO: Store target color/style rendering data
 };
 
 /**
@@ -115,6 +188,14 @@ format_output_file(FILE* file);
  */
 struct format_output
 format_output_buf(void);
+/**
+ * @brief Create a new @ref format_output that keep track of size but does not write anything.
+ * Calling @ref format_output_destroy on the returned value does nothing
+ *
+ * @return A new @ref format_output that will only store size
+ */
+struct format_output
+format_output_none(void);
 /**
  * @brief Destroy a @ref format_output
  *
@@ -160,6 +241,8 @@ format_output_flush(struct format_output* output);
  */
 int
 format_output_write(struct format_output* output, const char* buf, size_t len);
+
+/** @} */
 
 /**
  * @defgroup Formatters Default formatters
@@ -239,6 +322,7 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 
 #define FMT__CAR(a, ...) a
 #define FMT__CDR(a, ...) __VA_ARGS__
+#define FMT__CDR2(...) FMT__CDR(__VA_ARGS__)
 #define FMT__SECOND(a, b, ...) b
 
 #define FMT__PROBE() ~, 1
@@ -269,66 +353,117 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 #define FMT__TUPLE_FORMATTER(X) FMT__CAR(FMT__EXPAND X)
 #define FMT__TUPLE_EXPR(X) FMT__CDR(FMT__EXPAND X)
 
+#define FMT__IS_PAIR(X)                                                                          \
+	FMT__IF_ELSE(FMT__HAS_ARGS(FMT__CDR X))                                                      \
+	(FMT__IS_PAIR_2 X)(0)
+
+#define FMT__IS_PAIR_2(a, b, ...) FMT__NOT(FMT__HAS_ARGS(__VA_ARGS__))
+
+#define FMT__IS_TRIPLET(X)                                                                       \
+	FMT__IF_ELSE(FMT__HAS_ARGS(FMT__CDR2(FMT__CDR X)))                                           \
+	(FMT__IS_TRIPLET_3 X)(0)
+
+#define FMT__IS_TRIPLET_3(a, b, c, ...) FMT__NOT(FMT__HAS_ARGS(__VA_ARGS__))
+
 #define FMT__ARG_EXPAND(X)                                                                       \
-	FMT__IF_ELSE(FMT__IS_TUPLE(X))                                                               \
-	(FMT__TUPLE_FORMATTER(X), FMT__TUPLE_EXPR(X))(NULL, X)
+	FMT__IF_ELSE(FMT__IS_TUPLE(X))(FMT__TUPLE_FORMATTER(X), FMT__TUPLE_EXPR(X))(NULL, X)
 #define FMT___SELECT_0(X, ...) X
 #define FMT___SELECT_1(X, ...) FMT___SELECT_0(__VA_ARGS__)
-#define FMT__SELECT(N, ...) FMT___SELECT_##N(__VA_ARGS__)
+#define FMT___SELECT_2(X, ...) FMT___SELECT_1(__VA_ARGS__)
+#define FMT___SELECT(N, ...) FMT___SELECT_##N(__VA_ARGS__)
+#define FMT__SELECT(N, ...) FMT___SELECT(N, __VA_ARGS__)
 
 #define FMT__MAPPER_DEFAULT(N, ARG)                                                              \
 	__builtin_choose_expr(                                                                       \
 	  __builtin_types_compatible_p(long long, typeof(ARG)),                                      \
-	  ((struct fmt_arg){ format_fmt_long_long, 0 }),                                             \
+	  ((struct format_arg){ .type = kFormatScalar, .formatter = format_fmt_long_long, .data = 0 }), \
 	  __builtin_choose_expr(                                                                     \
 	    __builtin_types_compatible_p(long, typeof(ARG)),                                         \
-	    ((struct fmt_arg){ format_fmt_long, 0 }),                                                \
+	    ((struct format_arg){ .type = kFormatScalar, .formatter = format_fmt_long, .data = 0 }),    \
 	    __builtin_choose_expr(                                                                   \
 	      __builtin_types_compatible_p(int, typeof(ARG)),                                        \
-	      ((struct fmt_arg){ format_fmt_int, 0 }),                                               \
+	      ((struct format_arg){ .type = kFormatScalar, .formatter = format_fmt_int, .data = 0 }),   \
 	      __builtin_choose_expr(                                                                 \
 	        __builtin_types_compatible_p(short, typeof(ARG)),                                    \
-	        ((struct fmt_arg){ format_fmt_short, 0 }),                                           \
+	        ((struct format_arg){                                                                   \
+	          .type = kFormatScalar, .formatter = format_fmt_short, .data = 0 }),                \
 	        __builtin_choose_expr(                                                               \
 	          __builtin_types_compatible_p(char, typeof(ARG)),                                   \
-	          ((struct fmt_arg){ format_fmt_char, 0 }),                                          \
+	          ((struct format_arg){                                                                 \
+	            .type = kFormatScalar, .formatter = format_fmt_char, .data = 0 }),               \
 	          __builtin_choose_expr(                                                             \
 	            __builtin_types_compatible_p(unsigned long long, typeof(ARG)),                   \
-	            ((struct fmt_arg){ format_fmt_unsigned_long_long, 0 }),                          \
+	            ((struct format_arg){ .type = kFormatScalar,                                        \
+				                   .formatter = format_fmt_unsigned_long_long,                   \
+				                   .data = 0 }),                                                 \
 	            __builtin_choose_expr(                                                           \
 	              __builtin_types_compatible_p(unsigned long, typeof(ARG)),                      \
-	              ((struct fmt_arg){ format_fmt_unsigned_long, 0 }),                             \
+	              ((struct format_arg){                                                             \
+	                .type = kFormatScalar, .formatter = format_fmt_unsigned_long, .data = 0 }),  \
 	              __builtin_choose_expr(                                                         \
 	                __builtin_types_compatible_p(unsigned int, typeof(ARG)),                     \
-	                ((struct fmt_arg){ format_fmt_unsigned_int, 0 }),                            \
+	                ((struct format_arg){                                                           \
+	                  .type = kFormatScalar, .formatter = format_fmt_unsigned_int, .data = 0 }), \
 	                __builtin_choose_expr(                                                       \
 	                  __builtin_types_compatible_p(unsigned short, typeof(ARG)),                 \
-	                  ((struct fmt_arg){ format_fmt_unsigned_short, 0 }),                        \
+	                  ((struct format_arg){ .type = kFormatScalar,                                  \
+					                     .formatter = format_fmt_unsigned_short,                 \
+					                     .data = 0 }),                                           \
 	                  __builtin_choose_expr(                                                     \
 	                    __builtin_types_compatible_p(unsigned char, typeof(ARG)),                \
-	                    ((struct fmt_arg){ format_fmt_unsigned_char, 0 }),                       \
+	                    ((struct format_arg){ .type = kFormatScalar,                                \
+						                   .formatter = format_fmt_unsigned_char,                \
+						                   .data = 0 }),                                         \
 	                    __builtin_choose_expr(                                                   \
 	                      __builtin_types_compatible_p(signed char, typeof(ARG)),                \
-	                      ((struct fmt_arg){ format_fmt_signed_char, 0 }),                       \
+	                      ((struct format_arg){ .type = kFormatScalar,                              \
+						                     .formatter = format_fmt_signed_char,                \
+						                     .data = 0 }),                                       \
 	                      __builtin_choose_expr(                                                 \
 	                        __builtin_types_compatible_p(double, typeof(ARG)),                   \
-	                        ((struct fmt_arg){ format_fmt_double, 0 }),                          \
+	                        ((struct format_arg){ .type = kFormatScalar,                            \
+							                   .formatter = format_fmt_double,                   \
+							                   .data = 0 }),                                     \
 	                        __builtin_choose_expr(                                               \
 	                          __builtin_types_compatible_p(float, typeof(ARG)),                  \
-	                          ((struct fmt_arg){ format_fmt_float, 0 }),                         \
+	                          ((struct format_arg){ .type = kFormatScalar,                          \
+							                     .formatter = format_fmt_float,                  \
+							                     .data = 0 }),                                   \
 	                          __builtin_choose_expr(                                             \
 	                            __builtin_types_compatible_p(const char*, typeof(ARG)) ||        \
 	                              __builtin_types_compatible_p(char*, typeof(ARG)) ||            \
 	                              __builtin_types_compatible_p(const char[], typeof(ARG)) ||     \
 	                              __builtin_types_compatible_p(char[], typeof(ARG)),             \
-	                            ((struct fmt_arg){ format_fmt_str, 0 }),                         \
-	                            ((struct fmt_arg){ NULL, 0 })))))))))))))))
-#define FMT__MAPPER(N, ARG)                                                                      \
-	FMT__IF_ELSE(FMT__IS_TUPLE(ARG))(                                                            \
-	  ((struct fmt_arg){ FMT__SELECT(0, FMT__ARG_EXPAND(ARG)), 0 }))(                            \
-	  FMT__MAPPER_DEFAULT(N, FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))),
+	                            ((struct format_arg){ .type = kFormatScalar,                        \
+								                   .formatter = format_fmt_str,                  \
+								                   .data = 0 }),                                 \
+	                            ((struct format_arg){ .type = kFormatScalar,                        \
+								                   .formatter = NULL,                            \
+								                   .data = 0 })))))))))))))))
+#define FMT__MAPPER_TRIPLET_COLLECTION(X, Y)                                                     \
+	((struct format_arg){ .type = kFormatCollection, .collection = X, .data = 0 })
+#define FMT__MAPPER_TRIPLET(TAG, X, Y) FMT__CAT(FMT__MAPPER_TRIPLET_, TAG)(X, Y)
 
-#define FMT__SET(N, ARG)                                                                         \
+#define FMT__MAPPER(N, ARG)                                                                      \
+	FMT__IF_ELSE(FMT__IS_TRIPLET(ARG))(FMT__MAPPER_TRIPLET ARG)(                                 \
+	  FMT__IF_ELSE(FMT__IS_PAIR(ARG))(((struct format_arg){                                         \
+	    .type = kFormatScalar, .formatter = FMT__SELECT(0, FMT__ARG_EXPAND(ARG)), .data = 0 }))( \
+	    FMT__MAPPER_DEFAULT(N, FMT__SELECT(1, FMT__ARG_EXPAND(ARG))))),
+
+#define FMT__SET_COLLECTION(N, X, Y)                                                             \
+	{                                                                                            \
+		args[N].data = (uintptr_t)(Y);                                                           \
+	}
+#define FMT__SET_TRIPLET_(N, TAG, X, Y) FMT__CAT(FMT__SET_, TAG)(N, X, Y)
+
+#define FMT__IS_POINTER_VAR_P(VAR)                                                               \
+	(__builtin_types_compatible_p(const void*, typeof(VAR)) ||                                   \
+	 __builtin_types_compatible_p(char*, typeof(VAR)) ||                                         \
+	 __builtin_types_compatible_p(const char*, typeof(VAR)) ||                                   \
+	 __builtin_types_compatible_p(char[], typeof(VAR)) ||                                        \
+	 __builtin_types_compatible_p(const char[], typeof(VAR)))
+
+#define FMT__SET_DEFAULT(N, ARG)                                                                 \
 	{                                                                                            \
 		_Static_assert(sizeof(typeof(FMT__SELECT(1, FMT__ARG_EXPAND(ARG)))) <= sizeof(uint64_t), \
 		               "Invalid argument type");                                                 \
@@ -348,19 +483,25 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 			memcpy(&args[N].data, &temp, sizeof(temp));                                          \
 		}                                                                                        \
 	}
+#define FMT__SET(N, ARG)                                                                         \
+	FMT__IF_ELSE(FMT__IS_TRIPLET(ARG))                                                           \
+	(FMT__SET_TRIPLET_(N,                                                                        \
+	                   FMT__SELECT(0, FMT__EXPAND ARG),                                          \
+	                   FMT__SELECT(1, FMT__EXPAND ARG),                                          \
+	                   FMT__SELECT(2, FMT__EXPAND ARG)))(FMT__SET_DEFAULT(N, ARG))
 
 #define format(output, fmt, ...)                                                                 \
 	do {                                                                                         \
-		FORMAT_START_DIAG(clang)                                                                 \
-		FORMAT_DIAG(clang, ignored "-Wc2y-extensions")                                           \
+		FORMAT__START_DIAG(clang)                                                                 \
+		FORMAT__DIAG(clang, ignored "-Wc2y-extensions")                                           \
 		_Static_assert(__builtin_types_compatible_p(typeof(output), struct format_output*),      \
 		               "Invalid output type");                                                   \
 		_Static_assert(__builtin_types_compatible_p(typeof(fmt), const char*) ||                 \
 		                 __builtin_types_compatible_p(typeof(fmt), const char[]),                \
 		               "Invalid format string");                                                 \
-		struct fmt_arg args[] = { FMT__IF_ELSE(FMT__HAS_ARGS(__VA_ARGS__))(                      \
-		  FMT__EXPAND(FMT__EVAL(FMT__MAP(0, FMT__MAPPER, __VA_ARGS__))))()(struct fmt_arg){      \
-		  NULL, 0 } /* Sentinel */ };                                                            \
+		struct format_arg args[] = { FMT__IF_ELSE(FMT__HAS_ARGS(__VA_ARGS__))(                      \
+		  FMT__EXPAND(FMT__EVAL(FMT__MAP(0, FMT__MAPPER, __VA_ARGS__))))()(struct format_arg){      \
+		  .type = kFormatScalar, .formatter = NULL, .data = 0 } /* Sentinel */ };                \
 		enum                                                                                     \
 		{                                                                                        \
 			counter_base = __COUNTER__                                                           \
@@ -371,8 +512,81 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 		    output,                                                                              \
 		    fmt,                                                                                 \
 		    (const struct fmt_env){ .args = args, .size = sizeof(args) / sizeof(args[0]) - 1 }); \
-		FORMAT_END_DIAG(clang)                                                                   \
+		FORMAT__END_DIAG(clang)                                                                   \
 	} while (0)
+
+/** @} */
+
+/**
+ * @defgroup CustomFormat Custom formatters
+ * @{
+ */
+
+struct fmt_array_cursor
+{
+	void* cur;
+};
+
+static inline void*
+fmt__array_next(struct fmt_format_collection* collection)
+{
+	struct fmt_array_cursor* c = collection->state;
+	void* p = c->cur;
+	c->cur = (char*)c->cur + collection->elem_size;
+	return p;
+}
+
+static inline size_t
+fmt__array_width(struct fmt_format_collection* collection, const char* fmt, size_t n)
+{
+	struct fmt_array_cursor c = *(struct fmt_array_cursor*)collection->state;
+
+	struct format_arg arg;
+	arg.type = kFormatScalar;
+	arg.formatter = collection->formatter;
+
+	struct fmt_env env = {
+		.args = (struct format_arg*)&arg,
+		.size = 1,
+	};
+
+	struct format_output out = format_output_none();
+	for (size_t i = 0; i < n; ++i) {
+		const void* val = c.cur;
+
+		if (collection->is_pointer)
+			arg.data = *(uintptr_t*)val;
+		else
+			memcpy(&arg.data, val, collection->elem_size);
+		collection->formatter(&out, fmt, &env, 0);
+		c.cur = (char*)c.cur + collection->elem_size;
+	}
+
+	return out.size;
+}
+
+#define FORMAT__ARRAY_0(COL)                                                                     \
+	(COLLECTION,                                                                                 \
+	 ((struct fmt_format_collection){ .state = &(struct fmt_array_cursor){ .cur = (COL) },       \
+	                                  .next = fmt__array_next,                                   \
+	                                  .width = fmt__array_width,                                 \
+	                                  .formatter = FMT__MAPPER_DEFAULT(0, *(COL)).formatter,     \
+	                                  .elem_size = sizeof(*(COL)),                               \
+	                                  .is_pointer = FMT__IS_POINTER_VAR_P(*(COL)) }),            \
+	 COL)
+#define FORMAT__ARRAY_1(COL, FORMATTER)                                                          \
+	(COLLECTION,                                                                                 \
+	 ((struct fmt_format_collection){ .state = &(struct fmt_array_cursor){ .cur = (COL) },       \
+	                                  .next = fmt__array_next,                                   \
+	                                  .width = fmt__array_width,                                 \
+	                                  .formatter = FORMATTER,                                    \
+	                                  .elem_size = sizeof(*(COL)),                               \
+	                                  .is_pointer = FMT__IS_POINTER_VAR_P(*(COL)) }),            \
+	 COL)
+
+#define FORMAT_ARRAY(COL, ...)                                                                   \
+	FMT__IF_ELSE(FMT__HAS_ARGS(__VA_ARGS__))(FORMAT__ARRAY_1(COL, __VA_ARGS__))(                 \
+	  FORMAT__ARRAY_0(COL))
 
 /** @} */
 

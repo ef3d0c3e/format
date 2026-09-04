@@ -293,8 +293,15 @@ format_args(struct format_output* output, const char* fmt, const struct fmt_env 
 			sep = fmt + end;
 
 		/* Call formatter */
-		assert(env.args[index].formatter != NULL);
-		env.args[index].formatter(output, sep, &env, index);
+		if (env.args[index].type == kFormatScalar)
+		{
+			assert(env.args[index].formatter != NULL);
+			env.args[index].formatter(output, sep, &env, index);
+		}
+		else if (env.args[index].type == kFormatCollection)
+		{
+			format_fmt_collection(output, sep, &env, index);
+		}
 		i = end + 1;
 	}
 }

@@ -70,10 +70,19 @@ utf8_len(const char* str, size_t len);
 size_t
 parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env);
 
+size_t
+parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env);
+
 struct spec_placeholder
 parse_placeholder(const char *fmt_spec, size_t *i, const struct fmt_env *env);
 
 void
 parse_alignment(const char *fmt_spec, size_t *i, const struct fmt_env *env, char *alignment, struct spec_placeholder* fill, const char *default_placeholder);
+
+int
+format_fmt_collection(struct format_output* output,
+               const char* fmt_spec,
+               const struct fmt_env* env,
+               size_t idx);
 
 #endif // LIBFORMAT_FMT_H

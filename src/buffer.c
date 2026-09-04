@@ -70,6 +70,25 @@ format_output_buf(void)
 	};
 }
 
+struct format_output
+format_output_none(void)
+{
+	return (struct format_output){
+		.fg = ~0U,
+		.bg = ~0U,
+		.style = kFormatStyleNone,
+		.fd = -1,
+		.file = NULL,
+		.flush_mode = kFormatFlushNever_,
+		.data = NULL,
+		.size = 0,
+		.capacity = (size_t)-1,
+		.malloc = NULL,
+		.free = NULL,
+		.realloc = NULL,
+	};
+}
+
 void
 format_output_destroy(struct format_output* output)
 {
@@ -250,27 +269,31 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 	else {
 		assert(output->file == NULL && output->fd == -1);
 
-		/* Compute new capacity */
-		size_t new_cap = output->capacity ? output->capacity : 1;
-		while (new_cap < output->size + len) {
-			new_cap *= 2;
-		}
-		assert(new_cap >= len + output->size);
+		if (output->capacity != (size_t)-1)
+		{
 
-		/* Make space */
-		if (output->realloc) {
-			output->data = output->realloc(output->data, output->capacity, new_cap);
-		} else {
-			output->data = realloc(output->data, new_cap);
-		}
-		if (unlikely(output->data == NULL)) {
-			output->capacity = 0;
-			return -1;
-		}
-		output->capacity = new_cap;
+			/* Compute new capacity */
+			size_t new_cap = output->capacity ? output->capacity : 1;
+			while (new_cap < output->size + len) {
+				new_cap *= 2;
+			}
+			assert(new_cap >= len + output->size);
 
-		/* Copy */
-		memcpy(output->data + output->size, buf, len);
+			/* Make space */
+			if (output->realloc) {
+				output->data = output->realloc(output->data, output->capacity, new_cap);
+			} else {
+				output->data = realloc(output->data, new_cap);
+			}
+			if (unlikely(output->data == NULL)) {
+				output->capacity = 0;
+				return -1;
+			}
+			output->capacity = new_cap;
+
+			/* Copy */
+			memcpy(output->data + output->size, buf, len);
+		}
 		output->size += len;
 	}
 

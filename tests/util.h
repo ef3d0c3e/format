@@ -66,10 +66,10 @@ static inline void print_buffer(const char *buf, size_t len)
 
 #define test_printf(fmt_format_, fmt_printf_, ...) \
 do { \
-	FORMAT_START_DIAG(gcc) \
-	FORMAT_START_DIAG(clang) \
-	FORMAT_DIAG(gcc, ignored "-Wformat") \
-	FORMAT_DIAG(clang, ignored "-Wformat") \
+	FORMAT__START_DIAG(gcc) \
+	FORMAT__START_DIAG(clang) \
+	FORMAT__DIAG(gcc, ignored "-Wformat") \
+	FORMAT__DIAG(clang, ignored "-Wformat") \
 	char *buf; \
 	int len = asprintf(&buf, fmt_printf_, __VA_ARGS__); \
 	{ \
@@ -134,16 +134,16 @@ do { \
 		free(data); \
 	} \
 	free(buf); \
-	FORMAT_END_DIAG(clang) \
-	FORMAT_END_DIAG(gcc) \
+	FORMAT__END_DIAG(clang) \
+	FORMAT__END_DIAG(gcc) \
 } while (false)
 
 #define test_manual(fmt_format_, expected_, ...) \
 do { \
-	FORMAT_START_DIAG(gcc) \
-	FORMAT_START_DIAG(clang) \
-	FORMAT_DIAG(gcc, ignored "-Wformat") \
-	FORMAT_DIAG(clang, ignored "-Wformat") \
+	FORMAT__START_DIAG(gcc) \
+	FORMAT__START_DIAG(clang) \
+	FORMAT__DIAG(gcc, ignored "-Wformat") \
+	FORMAT__DIAG(clang, ignored "-Wformat") \
 	const size_t len = strlen(expected_); \
 	{ \
 		struct format_output out = format_output_buf(); \
@@ -206,8 +206,8 @@ do { \
 		close(fd); \
 		free(data); \
 	} \
-	FORMAT_END_DIAG(clang) \
-	FORMAT_END_DIAG(gcc) \
+	FORMAT__END_DIAG(clang) \
+	FORMAT__END_DIAG(gcc) \
 } while (false)
 
 #define CONCAT_(x, y) x ## y

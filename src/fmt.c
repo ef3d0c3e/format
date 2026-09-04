@@ -70,6 +70,34 @@ parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 	return size;
 }
 
+size_t
+parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env)
+{
+	size_t number = 0;
+	/* Reference */
+	if (fmt_spec[*i] == '{') {
+		++*i;
+		assert(isdigit(fmt_spec[*i]) && "Expected digit after `{'");
+		while (isdigit(fmt_spec[*i])) {
+			number = number * 10 + (size_t)(fmt_spec[*i] - '0');
+			++*i;
+			assert(number < env->size &&
+			       "Cannot reference element past the number of formatting arguments");
+		}
+		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
+		++*i;
+		number = (size_t)env->args[number].data;
+	}
+	/* Literal */
+	else if (isdigit(fmt_spec[*i])) {
+		while (isdigit(fmt_spec[*i])) {
+			number = number * 10 + (size_t)(fmt_spec[*i] - '0');
+			++*i;
+		}
+	}
+	return number;
+}
+
 struct spec_placeholder
 parse_placeholder(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 {
