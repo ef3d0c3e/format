@@ -56,7 +56,7 @@ utf8_len(const char* str, size_t len);
  * @brief Parse a numeric value associated to a size from a format specifier
  *
  * A numeric value is either an integer literal: `0`, `5`, `123456`, ...
- * Or a reference to an argument in @ref fmt_env: `{1}`, `{0}`, ...
+ * Or a reference to an argument in @ref format_env: `{1}`, `{0}`, ...
  *
  * This function may not parse a size greater than 16384 for safety reasons.
  * It will assert to make sure this doesn't happen.
@@ -68,21 +68,21 @@ utf8_len(const char* str, size_t len);
  * @return The parsed numeric value
  */
 size_t
-parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env);
+parse_size(const char* fmt_spec, size_t* i, const struct format_env* env);
 
 size_t
-parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env);
+parse_number(const char* fmt_spec, size_t* i, const struct format_env* env);
 
 struct spec_placeholder
-parse_placeholder(const char *fmt_spec, size_t *i, const struct fmt_env *env);
+parse_placeholder(const char *fmt_spec, size_t *i, const struct format_env *env);
 
 void
-parse_alignment(const char *fmt_spec, size_t *i, const struct fmt_env *env, char *alignment, struct spec_placeholder* fill, const char *default_placeholder);
+parse_alignment(const char *fmt_spec, size_t *i, const struct format_env *env, char *alignment, struct spec_placeholder* fill, const char *default_placeholder);
 
 int
 format_fmt_collection(struct format_output* output,
                const char* fmt_spec,
-               const struct fmt_env* env,
+               const struct format_env* env,
                size_t idx);
 
 #endif // LIBFORMAT_FMT_H

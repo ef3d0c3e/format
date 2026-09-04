@@ -43,10 +43,9 @@ struct number_spec
  * @return Parsed @ref number_spec for @p fmt_spec
  */
 static inline struct number_spec
-parse_number_spec(const char* fmt_spec, const struct fmt_env* env)
+parse_number_spec(const char* fmt_spec, const struct format_env* env)
 {
 	struct number_spec spec = {
-		.fill = { ' ', 0, 0, 0, 0 }, /* Space */
 		.align = 0,
 		.sign = '-', /* Negative only */
 		.alternate = 0,
@@ -336,7 +335,7 @@ write_aligned(struct format_output* output,
 int
 format_fmt_long_long(struct format_output* output,
                      const char* fmt_spec,
-                     const struct fmt_env* env,
+                     const struct format_env* env,
                      size_t idx)
 {
 	dispatch_signed(long long);
@@ -345,7 +344,7 @@ format_fmt_long_long(struct format_output* output,
 int
 format_fmt_unsigned_long_long(struct format_output* output,
                               const char* fmt_spec,
-                              const struct fmt_env* env,
+                              const struct format_env* env,
                               size_t idx)
 {
 	dispatch_unsigned(unsigned long long);
@@ -354,7 +353,7 @@ format_fmt_unsigned_long_long(struct format_output* output,
 int
 format_fmt_long(struct format_output* output,
                 const char* fmt_spec,
-                const struct fmt_env* env,
+                const struct format_env* env,
                 size_t idx)
 {
 	dispatch_signed(long);
@@ -363,7 +362,7 @@ format_fmt_long(struct format_output* output,
 int
 format_fmt_unsigned_long(struct format_output* output,
                          const char* fmt_spec,
-                         const struct fmt_env* env,
+                         const struct format_env* env,
                          size_t idx)
 {
 	dispatch_unsigned(unsigned long);
@@ -372,7 +371,7 @@ format_fmt_unsigned_long(struct format_output* output,
 int
 format_fmt_int(struct format_output* output,
                const char* fmt_spec,
-               const struct fmt_env* env,
+               const struct format_env* env,
                size_t idx)
 {
 	dispatch_signed(int);
@@ -381,7 +380,7 @@ format_fmt_int(struct format_output* output,
 int
 format_fmt_unsigned_int(struct format_output* output,
                         const char* fmt_spec,
-                        const struct fmt_env* env,
+                        const struct format_env* env,
                         size_t idx)
 {
 	dispatch_unsigned(unsigned int);
@@ -390,7 +389,7 @@ format_fmt_unsigned_int(struct format_output* output,
 int
 format_fmt_short(struct format_output* output,
                  const char* fmt_spec,
-                 const struct fmt_env* env,
+                 const struct format_env* env,
                  size_t idx)
 {
 	dispatch_signed(short);
@@ -399,7 +398,7 @@ format_fmt_short(struct format_output* output,
 int
 format_fmt_unsigned_short(struct format_output* output,
                           const char* fmt_spec,
-                          const struct fmt_env* env,
+                          const struct format_env* env,
                           size_t idx)
 {
 	dispatch_unsigned(unsigned short);
@@ -408,7 +407,7 @@ format_fmt_unsigned_short(struct format_output* output,
 int
 format_fmt_signed_char(struct format_output* output,
                        const char* fmt_spec,
-                       const struct fmt_env* env,
+                       const struct format_env* env,
                        size_t idx)
 {
 	dispatch_signed(signed char);
@@ -417,7 +416,7 @@ format_fmt_signed_char(struct format_output* output,
 int
 format_fmt_unsigned_char(struct format_output* output,
                          const char* fmt_spec,
-                         const struct fmt_env* env,
+                         const struct format_env* env,
                          size_t idx)
 {
 	dispatch_unsigned(unsigned char);

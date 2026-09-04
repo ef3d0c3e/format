@@ -40,7 +40,7 @@ utf8_len_str(const char* str, size_t len)
 }
 
 size_t
-parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env)
+parse_size(const char* fmt_spec, size_t* i, const struct format_env* env)
 {
 	size_t size = 0;
 	/* Reference */
@@ -71,7 +71,7 @@ parse_size(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 }
 
 size_t
-parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env)
+parse_number(const char* fmt_spec, size_t* i, const struct format_env* env)
 {
 	size_t number = 0;
 	/* Reference */
@@ -99,7 +99,7 @@ parse_number(const char* fmt_spec, size_t* i, const struct fmt_env* env)
 }
 
 struct spec_placeholder
-parse_placeholder(const char* fmt_spec, size_t* i, const struct fmt_env* env)
+parse_placeholder(const char* fmt_spec, size_t* i, const struct format_env* env)
 {
 	struct spec_placeholder placeholder;
 	/* Parse from arg list */
@@ -203,7 +203,7 @@ write_placeholder(struct format_output* output,
 void
 parse_alignment(const char* fmt_spec,
                 size_t* i,
-                const struct fmt_env* env,
+                const struct format_env* env,
                 char* alignment,
                 struct spec_placeholder* fill,
                 const char* default_placeholder)

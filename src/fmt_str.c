@@ -33,7 +33,7 @@ struct string_spec
 };
 
 static inline struct string_spec
-parse_string_spec(const char* fmt_spec, const struct fmt_env* env)
+parse_string_spec(const char* fmt_spec, const struct format_env* env)
 {
 	struct string_spec spec = {
 		.align = '<',                /* Left-aligned by default */
@@ -81,7 +81,7 @@ parse_string_spec(const char* fmt_spec, const struct fmt_env* env)
 int
 format_fmt_str(struct format_output* output,
                const char* fmt_spec,
-               const struct fmt_env* env,
+               const struct format_env* env,
                size_t idx)
 {
 	struct string_spec spec = parse_string_spec(fmt_spec, env);

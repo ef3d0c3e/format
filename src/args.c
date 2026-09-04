@@ -244,7 +244,7 @@ fmt_style(struct format_output* output, const char* fmt, size_t* i)
 }
 
 void
-format_args(struct format_output* output, const char* fmt, const struct fmt_env env)
+format_args(struct format_output* output, const char* fmt, const struct format_env env)
 {
 	// TODO: Err handling
 	size_t cur_positional = 0;

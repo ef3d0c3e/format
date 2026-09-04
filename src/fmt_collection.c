@@ -31,7 +31,7 @@ struct collection_spec
 };
 
 static inline struct collection_spec
-parse_collection_spec(const char* fmt_spec, const struct fmt_env* env)
+parse_collection_spec(const char* fmt_spec, const struct format_env* env)
 {
 	struct collection_spec spec = {
 		.precision = 0,
@@ -98,13 +98,13 @@ parse_collection_spec(const char* fmt_spec, const struct fmt_env* env)
 int
 format_fmt_collection(struct format_output* output,
                       const char* fmt_spec,
-                      const struct fmt_env* env,
+                      const struct format_env* env,
                       size_t idx)
 {
 	struct collection_spec spec = parse_collection_spec(fmt_spec, env);
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
-	struct fmt_format_collection* collection = &env->args[idx].collection;
+	struct format_arg_collection* collection = &env->args[idx].collection;
 	assert(collection->formatter);
 	assert(collection->width);
 
@@ -121,7 +121,7 @@ format_fmt_collection(struct format_output* output,
 	args[1].formatter = NULL;
 	args[1].data = 0;
 
-	struct fmt_env subenv = {
+	struct format_env subenv = {
 		.args = (struct format_arg*)&args,
 		.size = 1,
 	};
