@@ -3,3 +3,4 @@ build/
 fmt
 libfmt.a
 compile_commands.json
+docs/html

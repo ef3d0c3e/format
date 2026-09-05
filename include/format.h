@@ -621,6 +621,16 @@ format__collection_array_width(struct format_arg_collection* collection,
 /**
  * @brief Format macro for arrays
  *
+ * \gb{'['} \gt{number, number of elements to display} \gb{']'} <br>
+ * \gi{ } \gto{alignment, alignment} <br>
+ * \gi{ } \gto{number,width} <br>
+ * \gi{ } (\gb{'#'} <br>
+ * \gi{ } \gi{ } \gt{spec, start delimiter} <br>
+ * \gi{ } \gi{ } \gt{spec, element separator} <br>
+ * \gi{ } \gi{ } \gt{spec, end delimiter} <br>
+ * \gi{ } )? <br>
+ * \gi{ } \gb{':\{'} \gt{expression, format expression for array elements} \gb{'\}'}
+ *
  * @param ARRAY Array to format
  * @param ... (optional) Custom formatter for elements in @p ARRAY
  */
@@ -629,5 +639,148 @@ format__collection_array_width(struct format_arg_collection* collection,
 	  FORMAT__ARRAY_0(ARRAY))
 
 /** @} */
+
+/**
+ * @defgroup Grammar Format expression grammar
+ * @{
+ *
+ * @anchor grammar_number
+ * # Number
+ *
+ * \gb{number} \gb{ := } \gb{ integer } <i>parse literally from the format string</i> <br>
+ * \gi{ } \gi{ } \gb{| '\{' integer '\}'} <i>parse integer and retrieve the corresponding argument in the
+ * argument list</i>
+ *
+ * A number is a positive integer parsed directly from the format string or from the list of
+ * arguments.
+ *
+ * #### Examples
+ *
+ *  - `format(out, "{:.5}", "Hello, World")`
+ *  - `format(out, "{:15}", "Hello, World")`
+ *  - `format(out, "{:.{1}}", "Hello, World", 4)`
+ *  - `format(out, "{:[{1}]}", FORMAT_ARRAY(array), sizeof(array) / sizeof(array[0]))`
+ *
+ * @anchor grammar_size
+ * # Size
+ *
+ * Parsing rules for size are the same as @ref grammar_number "number", except that they are limited to 16384.
+ * When referring to *width*, they commonly refer to the number of UTF-8 codepoints, and not the number of bytes.
+ *
+ * @anchor grammar_spec
+ * # Specifier
+ *
+ * \gb{spec} \gb{ := } \gb{ codepoint } <i>parse literally from the format string</i> <br>
+ * \gi{ } \gi{ } \gb{| '\{' integer '\}'} <i>parse integer and retrieve the corresponding argument in the
+ * argument list</i>
+ *
+ * A specifier is a literal string that can either be present as a single UTF-8 codepoint in the
+ * format string, or a string retrieved from the list of arguments.
+ *
+ * #### Examples
+ *
+ *  - `format(out, "{:#[]}", "Hello") -> "[Hello]"`
+ *  - `format(out, "{:#''}", "Hello") -> "'Hello'"`
+ *  - `format(out, "{:{1}<10}", 15, ". ") -> "15. . . . "`
+ *
+ * @anchor grammar_alignment
+ * # Alignment
+ *
+ * \gb{alignment} \gb{ := } \gto{spec, fill string} \gb{'<'} <i>left-aligned</i> <br>
+ * \gi{ } \gi{ } \gb{|} \gto{spec, fill string} \gb{'>'} <i>right-aligned</i> <br>
+ * \gi{ } \gi{ } \gb{|} \gto{spec, fill string} \gb{'~'} <i>center-aligned</i>
+ *
+ * Define the alignment mode and set the fill string for a formatted value.
+ *
+ * #### Examples
+ *
+ *  - `format(out, "{:>10}", "Hello") -> "     Hello"`
+ *  - `format(out, "{:<10}", "Hello") -> "Hello     "`
+ *  - `format(out, "{:^10}", "Hello") -> "   Hello  "`
+ *  - `format(out, "{:-^10}", "Hello") -> "---Hello--"`
+ *  - `format(out, "{:{1}>10}", "Hello", "-_") -> "-_-_-Hello"`
+ *
+ * # Type formatting
+ *
+ * ## Scalar
+ *
+ * @anchor grammar_format_string
+ * ### String
+ *
+ * \gb{format_string} := \gto{alignment, alignment} <br>
+ * \gi{ } \gto{size, width of the formatted string} <br>
+ * \gi{ } (\gb{'#'} <br>
+ * \gi{ } \gi{ } \gt{spec, right quote} <br>
+ * \gi{ } \gi{ } \gt{spec, left quote} <br>
+ * \gi{ } )? <br>
+ * \gi{ } (\gb{'.'} <br>
+ * \gi{ } \gi{ } \gt{number, precision\, maximum number of BYTES to display} <br>
+ * \gi{ } )? <br>
+ * \gi{ } ( \gb{'s'} | \gb{'?'} | \gb{'x'} )? <i>display type</i>
+ *
+ * **Display type** This is a single character that defines how values in the string are printed:
+ *  - `s` *(default)* Values are printed as-is.
+ *  - `?` Non-printables are displayed using their common escape sequence, for instance `\n` is displayed as `\n` instead of putting a newline.
+ *    Other values without a common escape sequence are displayed using the `\xXX` format.
+ *  - `x` Non-printables are displayed using the `0xXX` format.
+ *
+ * #### Examples
+ *
+ *  - `format(out, "{:}", "Hello") -> "Hello"`
+ *  - `format(out, "{:#''}", "Hello") -> "'Hello'"`
+ *  - `format(out, "{:.2}", "Hello") -> "He"`
+ *  - `format(out, "{:5.2}", "Hello") -> "He   "`
+ *  - `format(out, "{:?}", "\nT\x87") -> "\nT\x87"`
+ *  - `format(out, "{:x}", "\nT\x87") -> "0x0AT0x87"`
+ *
+ *
+ * @anchor grammar_format_signed
+ * ### Signed integer
+ *
+ * \gb{format_signed} := \gto{alignment, alignment} <br>
+ * \gi{ } (\gb{'-'} | \gb{'+'} | \gb{' '})? <i>sign</i> <br>
+ * \gi{ } \gb{'#'}? <i>alternate mode</i> <br>
+ * \gi{ } \gb{'0'}? <i>align with `0`'s</i> <br>
+ * \gi{ } \gto{size, width of the formatted number} <br>
+ * \gi{ } (\gb{'.'} <br>
+ * \gi{ } \gi{ } \gt{number, precision} <br>
+ * \gi{ } )? <br>
+ * \gi{ } ( \gb{'x'} | \gb{'X'} | \gb{'b'} | \gb{'B'} )? <i>display type</i>
+ *
+ * Note that you may not use alignment if you use the align with 0's option.
+ *
+ * Format an integer following rules similar to `printf`.
+ *
+ * #### Examples
+ *
+ *  - `format(out, "{}", 123) -> "123"`
+ *  - `format(out, "{:x}", 123) -> "7b"`
+ *  - `format(out, "{:#x}", 123) -> "0x7b"`
+ *  - `format(out, "{:#X}", 123) -> "0x7B"`
+ *  - `format(out, "{:05}", 1) -> "00001"`
+ *  - `format(out, "{:05}", -1) -> "-0001"`
+ *  - `format(out, "{:+}", 1) -> "+1"`
+ *  - `format(out, "{: }", 1) -> " 1"`
+ *  - `format(out, "{:.5}", 1) -> "-00001"`
+ *
+ *
+ * ### Unsigned integer
+ *
+ * @anchor grammar_format_collection
+ * ## Collection
+ *
+ * \gb{format_collection} := \gb{'['} \gt{number, number of elements to display} \gb{']'} <br>
+ * \gi{ } \gto{alignment, alignment} <br>
+ * \gi{ } \gto{size,width} <br>
+ * \gi{ } (\gb{'#'} <br>
+ * \gi{ } \gi{ } \gt{spec, start delimiter} <br>
+ * \gi{ } \gi{ } \gt{spec, element separator} <br>
+ * \gi{ } \gi{ } \gt{spec, end delimiter} <br>
+ * \gi{ } )? <br>
+ * \gi{ } \gb{':\{'} \gt{expression, format expression for array elements} \gb{'\}'}
+ *
+ *
+ * @}
+ */
 
 #endif // LIBFORMAT_H
