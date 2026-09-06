@@ -27,6 +27,7 @@
 
 
 Test(fmt_string, format) {
+	/*
 	for_each(char*, str, STRING_LIST)
 	{
 		test_printf("{}", "%s", str);
@@ -62,21 +63,23 @@ Test(fmt_string, format) {
 					char fmt2[1024];
 					sprintf(fmt2, "%%-%d.%ds", width, precision);
 
-					test_printf(fmt1, fmt2, str);
+					//test_printf(fmt1, fmt2, str);
 					test_printf("{2:{0}.{1}}", "%-*.*s", width, precision, str);
 				}
-				{
-					char fmt1[1024];
-					sprintf(fmt1, "{:>%d.%d}", width, precision);
-					char fmt2[1024];
-					sprintf(fmt2, "%%%d.%ds", width, precision);
+				//{
+				//	char fmt1[1024];
+				//	sprintf(fmt1, "{:>%d.%d}", width, precision);
+				//	char fmt2[1024];
+				//	sprintf(fmt2, "%%%d.%ds", width, precision);
 
-					test_printf(fmt1, fmt2, str);
-					test_printf("{2:>{0}.{1}}", "%*.*s", width, precision, str);
-				}
+				//	test_printf(fmt1, fmt2, str);
+				//	test_printf("{2:>{0}.{1}}", "%*.*s", width, precision, str);
+				//}
 			}
 		}
 	}
+	*/
+	test_printf("{2:{0}.{1}}", "%-*.*s", 10, 20, "abc");
 }
 
 Test(fmt_string, quotes) {

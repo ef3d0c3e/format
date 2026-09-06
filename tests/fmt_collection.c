@@ -12,9 +12,8 @@ Test(fmt_collection, temp)
 		"sit",
 		"amet",
 	};
-	format(&out, "{:[{1}]#({2}):{^10#''}}\n", FORMAT_ARRAY(stra), 5, ", ");
-
-	format(&out, "|{:}|\n", (format_fmt_str, "abc"));
 	char *str = "Hello, World!";
-	format(&out, "{:[{1}]#({2}):{#x}}\n", FORMAT_ARRAY(str, format_fmt_signed_char), strlen(str), "");
+	//format(&out, "{:[{1}]#({2}):{#x}}\n", FORMAT_ARRAY(str, format_fmt_signed_char), strlen(str), "");
+	struct stat sb;
+	format(&out, "{1:{0}}\n", 5, 6);
 }

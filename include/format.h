@@ -1,6 +1,7 @@
 #ifndef LIBFORMAT_H
 #define LIBFORMAT_H
 
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -347,6 +348,19 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 #define FORMAT__EVAL2(...) FORMAT__EVAL1(FORMAT__EVAL1(__VA_ARGS__))
 #define FORMAT__EVAL1(...) __VA_ARGS__
 
+#define FORMAT__EVAL_T(...) FORMAT__EVAL_T1024(__VA_ARGS__)
+#define FORMAT__EVAL_T1024(...) FORMAT__EVAL_T512(FORMAT__EVAL_T512(__VA_ARGS__))
+#define FORMAT__EVAL_T512(...) FORMAT__EVAL_T256(FORMAT__EVAL_T256(__VA_ARGS__))
+#define FORMAT__EVAL_T256(...) FORMAT__EVAL_T128(FORMAT__EVAL_T128(__VA_ARGS__))
+#define FORMAT__EVAL_T128(...) FORMAT__EVAL_T64(FORMAT__EVAL_T64(__VA_ARGS__))
+#define FORMAT__EVAL_T64(...) FORMAT__EVAL_T32(FORMAT__EVAL_T32(__VA_ARGS__))
+#define FORMAT__EVAL_T32(...) FORMAT__EVAL_T16(FORMAT__EVAL_T16(__VA_ARGS__))
+#define FORMAT__EVAL_T16(...) FORMAT__EVAL_T8(FORMAT__EVAL_T8(__VA_ARGS__))
+#define FORMAT__EVAL_T8(...) FORMAT__EVAL_T4(FORMAT__EVAL_T4(__VA_ARGS__))
+#define FORMAT__EVAL_T4(...) FORMAT__EVAL_T2(FORMAT__EVAL_T2(__VA_ARGS__))
+#define FORMAT__EVAL_T2(...) FORMAT__EVAL_T1(FORMAT__EVAL_T1(__VA_ARGS__))
+#define FORMAT__EVAL_T1(...) __VA_ARGS__
+
 #define FORMAT__CAR(a, ...) a
 #define FORMAT__CDR(a, ...) __VA_ARGS__
 #define FORMAT__CDR2(...) FORMAT__CDR(__VA_ARGS__)
@@ -358,161 +372,151 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 #define FORMAT___NOT_0 FORMAT__PROBE()
 #define FORMAT__BOOL(x) FORMAT__NOT(FORMAT__NOT(x))
 
-#define FORMAT__IF_ELSE(cond) FORMAT___IF_ELSE(FORMAT__BOOL(cond))
 #define FORMAT___IF_ELSE(cond) FORMAT__CAT(FORMAT___IF_, cond)
 #define FORMAT___IF_1(...) __VA_ARGS__ FORMAT___IF_1_ELSE
 #define FORMAT___IF_0(...) FORMAT___IF_0_ELSE
 #define FORMAT___IF_1_ELSE(...)
 #define FORMAT___IF_0_ELSE(...) __VA_ARGS__
+#define FORMAT__IF_ELSE(cond) FORMAT___IF_ELSE(FORMAT__BOOL(cond))
 
-#define FORMAT__HAS_ARGS(...) FORMAT__BOOL(__VA_OPT__(1 +) 0)
 #define FORMAT___END_OF_ARGS_() 0
+#define FORMAT__HAS_ARGS(...) FORMAT__BOOL(__VA_OPT__(1 +) 0)
 
 #define FORMAT__CAT(a, b) a##b
 
-#define FORMAT__MAP(__counter_base, __m, __first, ...)                                           \
-	__m(__COUNTER__ - __counter_base - 1, __first) FORMAT__IF_ELSE(FORMAT__HAS_ARGS(             \
-	  __VA_ARGS__))(FORMAT__DEFER2(FORMAT___MAP)()(__counter_base, __m, __VA_ARGS__))()
 #define FORMAT___MAP() FORMAT__MAP
+#define FORMAT__MAP(__m, __first, ...)                                                           \
+	__m(__first) FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(                                 \
+	  FORMAT__DEFER2(FORMAT___MAP)()(__m, __VA_ARGS__))()
+
+#define FORMAT___MAP_CONST() FORMAT__MAP_CONST
+#define FORMAT__MAP_CONST(__m, __const, __first, ...)                                            \
+	__m(__const, __first) FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(                        \
+	  FORMAT__DEFER2(FORMAT___MAP_CONST)()(__m, __const, __VA_ARGS__))()
 
 #define FORMAT__CONSUME(...)
-#define FORMAT__IS_TUPLE(X) FORMAT__NOT(FORMAT__HAS_ARGS(FORMAT__CONSUME X))
-#define FORMAT__TUPLE_FORMATTER(X) FORMAT__CAR(FORMAT__EXPAND X)
-#define FORMAT__TUPLE_EXPR(X) FORMAT__CDR(FORMAT__EXPAND X)
 
-#define FORMAT__IS_PAIR(X)                                                                       \
-	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(FORMAT__CDR X))                                             \
-	(FORMAT__IS_PAIR_2 X)(0)
+#define FORMAT___IS_PAIR_1(first, ...)                                                           \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(0)(FORMAT___IS_PAIR_2(first))
+#define FORMAT___IS_PAIR_2_IS_TUPLE(X) FORMAT__IS_PROBE(FORMAT___IS_PAIR_2_TUPLE_PROBE X)
+#define FORMAT___IS_PAIR_2_TUPLE_PROBE(...) FORMAT__PROBE()
+#define FORMAT___IS_PAIR_2(X)                                                                    \
+	FORMAT__IF_ELSE(FORMAT___IS_PAIR_2_IS_TUPLE(X))(FORMAT___IS_PAIR_3 X)(0)
+#define FORMAT___IS_PAIR_3(a, ...)                                                               \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(FORMAT___IS_PAIR_4(__VA_ARGS__))(0)
+#define FORMAT___IS_PAIR_4(b, ...) FORMAT__NOT(FORMAT__HAS_ARGS(__VA_ARGS__))
+#define FORMAT__IS_PAIR(...) FORMAT___IS_PAIR_1(__VA_ARGS__)
 
-#define FORMAT__IS_PAIR_2(a, b, ...) FORMAT__NOT(FORMAT__HAS_ARGS(__VA_ARGS__))
+_Static_assert(!FORMAT__IS_PAIR());
+_Static_assert(!FORMAT__IS_PAIR(0));
+_Static_assert(!FORMAT__IS_PAIR(0, 1));
+_Static_assert(!FORMAT__IS_PAIR(0, 1, 2));
+_Static_assert(!FORMAT__IS_PAIR(()));
+_Static_assert(!FORMAT__IS_PAIR((0)));
+_Static_assert(FORMAT__IS_PAIR((0, 1)));
+_Static_assert(!FORMAT__IS_PAIR((0, 1, 2)));
 
-#define FORMAT__IS_TRIPLET(X)                                                                    \
-	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(FORMAT__CDR2(FORMAT__CDR X)))                               \
-	(FORMAT__IS_TRIPLET_3 X)(0)
+#define FORMAT___IS_TRIPLET_1(first, ...)                                                        \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(0)(FORMAT___IS_TRIPLET_2(first))
+#define FORMAT___IS_TRIPLET_2_IS_TUPLE(X) FORMAT__IS_PROBE(FORMAT___IS_TRIPLET_2_TUPLE_PROBE X)
+#define FORMAT___IS_TRIPLET_2_TUPLE_PROBE(...) FORMAT__PROBE()
+#define FORMAT___IS_TRIPLET_2(X)                                                                 \
+	FORMAT__IF_ELSE(FORMAT___IS_TRIPLET_2_IS_TUPLE(X))(FORMAT___IS_TRIPLET_3 X)(0)
+#define FORMAT___IS_TRIPLET_3(a, ...)                                                            \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(FORMAT___IS_TRIPLET_4(__VA_ARGS__))(0)
+#define FORMAT___IS_TRIPLET_4(b, ...)                                                            \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(FORMAT___IS_TRIPLET_5(__VA_ARGS__))(0)
+#define FORMAT___IS_TRIPLET_5(c, ...) FORMAT__NOT(FORMAT__HAS_ARGS(__VA_ARGS__))
+#define FORMAT__IS_TRIPLET(...) FORMAT___IS_TRIPLET_1(__VA_ARGS__)
 
-#define FORMAT__IS_TRIPLET_3(a, b, c, ...) FORMAT__NOT(FORMAT__HAS_ARGS(__VA_ARGS__))
+_Static_assert(!FORMAT__IS_TRIPLET());
+_Static_assert(!FORMAT__IS_TRIPLET(0));
+_Static_assert(!FORMAT__IS_TRIPLET(0, 1));
+_Static_assert(!FORMAT__IS_TRIPLET(0, 1, 2));
+_Static_assert(!FORMAT__IS_TRIPLET(0, 1, 2, 4));
+_Static_assert(!FORMAT__IS_TRIPLET(()));
+_Static_assert(!FORMAT__IS_TRIPLET((0)));
+_Static_assert(!FORMAT__IS_TRIPLET((0, 1)));
+_Static_assert(FORMAT__IS_TRIPLET((0, 1, 2)));
+_Static_assert(!FORMAT__IS_TRIPLET((0, 1, 2, 4)));
 
-#define FORMAT__ARG_EXPAND(X)                                                                    \
-	FORMAT__IF_ELSE(FORMAT__IS_TUPLE(X))(FORMAT__TUPLE_FORMATTER(X),                             \
-	                                     FORMAT__TUPLE_EXPR(X))(NULL, X)
+#define FORMAT__IS_POINTER_VAR_P(VAR)                                                            \
+	(__builtin_classify_type(VAR) == __builtin_classify_type((void*)0))
+
 #define FORMAT___SELECT_0(X, ...) X
 #define FORMAT___SELECT_1(X, ...) FORMAT___SELECT_0(__VA_ARGS__)
 #define FORMAT___SELECT_2(X, ...) FORMAT___SELECT_1(__VA_ARGS__)
 #define FORMAT___SELECT(N, ...) FORMAT___SELECT_##N(__VA_ARGS__)
 #define FORMAT__SELECT(N, ...) FORMAT___SELECT(N, __VA_ARGS__)
 
-#define FORMAT__MAPPER_DEFAULT(N, ARG)                                                           \
+#define FORMAT__MAPPER_CHOOSE(ARG, RULE)                                                         \
 	__builtin_choose_expr(                                                                       \
-	  __builtin_types_compatible_p(long long, typeof(ARG)),                                      \
-	  ((struct format_arg){                                                                      \
-	    .type = kFormatScalar, .formatter = format_fmt_long_long, .data = 0 }),                  \
-	  __builtin_choose_expr(                                                                     \
-	    __builtin_types_compatible_p(long, typeof(ARG)),                                         \
-	    ((struct format_arg){ .type = kFormatScalar, .formatter = format_fmt_long, .data = 0 }), \
-	    __builtin_choose_expr(                                                                   \
-	      __builtin_types_compatible_p(int, typeof(ARG)),                                        \
-	      ((struct format_arg){                                                                  \
-	        .type = kFormatScalar, .formatter = format_fmt_int, .data = 0 }),                    \
-	      __builtin_choose_expr(                                                                 \
-	        __builtin_types_compatible_p(short, typeof(ARG)),                                    \
-	        ((struct format_arg){                                                                \
-	          .type = kFormatScalar, .formatter = format_fmt_short, .data = 0 }),                \
-	        __builtin_choose_expr(                                                               \
-	          __builtin_types_compatible_p(char, typeof(ARG)),                                   \
-	          ((struct format_arg){                                                              \
-	            .type = kFormatScalar, .formatter = format_fmt_char, .data = 0 }),               \
-	          __builtin_choose_expr(                                                             \
-	            __builtin_types_compatible_p(unsigned long long, typeof(ARG)),                   \
-	            ((struct format_arg){ .type = kFormatScalar,                                     \
-				                      .formatter = format_fmt_unsigned_long_long,                \
-				                      .data = 0 }),                                              \
-	            __builtin_choose_expr(                                                           \
-	              __builtin_types_compatible_p(unsigned long, typeof(ARG)),                      \
-	              ((struct format_arg){                                                          \
-	                .type = kFormatScalar, .formatter = format_fmt_unsigned_long, .data = 0 }),  \
-	              __builtin_choose_expr(                                                         \
-	                __builtin_types_compatible_p(unsigned int, typeof(ARG)),                     \
-	                ((struct format_arg){                                                        \
-	                  .type = kFormatScalar, .formatter = format_fmt_unsigned_int, .data = 0 }), \
-	                __builtin_choose_expr(                                                       \
-	                  __builtin_types_compatible_p(unsigned short, typeof(ARG)),                 \
-	                  ((struct format_arg){ .type = kFormatScalar,                               \
-					                        .formatter = format_fmt_unsigned_short,              \
-					                        .data = 0 }),                                        \
-	                  __builtin_choose_expr(                                                     \
-	                    __builtin_types_compatible_p(unsigned char, typeof(ARG)),                \
-	                    ((struct format_arg){ .type = kFormatScalar,                             \
-						                      .formatter = format_fmt_unsigned_char,             \
-						                      .data = 0 }),                                      \
-	                    __builtin_choose_expr(                                                   \
-	                      __builtin_types_compatible_p(signed char, typeof(ARG)),                \
-	                      ((struct format_arg){ .type = kFormatScalar,                           \
-						                        .formatter = format_fmt_signed_char,             \
-						                        .data = 0 }),                                    \
-	                      __builtin_choose_expr(                                                 \
-	                        __builtin_types_compatible_p(double, typeof(ARG)),                   \
-	                        ((struct format_arg){ .type = kFormatScalar,                         \
-							                      .formatter = format_fmt_double,                \
-							                      .data = 0 }),                                  \
-	                        __builtin_choose_expr(                                               \
-	                          __builtin_types_compatible_p(float, typeof(ARG)),                  \
-	                          ((struct format_arg){ .type = kFormatScalar,                       \
-							                        .formatter = format_fmt_float,               \
-							                        .data = 0 }),                                \
-	                          __builtin_choose_expr(                                             \
-	                            __builtin_types_compatible_p(const char*, typeof(ARG)) ||        \
-	                              __builtin_types_compatible_p(char*, typeof(ARG)) ||            \
-	                              __builtin_types_compatible_p(const char[], typeof(ARG)) ||     \
-	                              __builtin_types_compatible_p(char[], typeof(ARG)),             \
-	                            ((struct format_arg){ .type = kFormatScalar,                     \
-								                      .formatter = format_fmt_str,               \
-								                      .data = 0 }),                              \
-	                            ((struct format_arg){ .type = kFormatScalar,                     \
-								                      .formatter = NULL,                         \
-								                      .data = 0 })))))))))))))))
-#define FORMAT__MAPPER_TRIPLET_COLLECTION(X, Y)                                                  \
-	((struct format_arg){ .type = kFormatCollection, .collection = X, .data = 0 })
-#define FORMAT__MAPPER_TRIPLET(TAG, X, Y) FORMAT__CAT(FORMAT__MAPPER_TRIPLET_, TAG)(X, Y)
+	  __builtin_types_compatible_p(FORMAT__SELECT(0, FORMAT__EXPAND RULE), typeof((ARG))),       \
+	  format_arg__.formatter = FORMAT__SELECT(1, FORMAT__EXPAND RULE),                           \
+	  (void)0);
+#define FORMAT__CHOOSE(ARG)                                                                      \
+	FORMAT__EXPAND(                                                                              \
+	  FORMAT__EVAL_T(FORMAT__MAP_CONST(FORMAT__MAPPER_CHOOSE,                                    \
+	                                   ARG,                                                      \
+	                                   (long long, format_fmt_long_long),                        \
+	                                   (long, format_fmt_long),                                  \
+	                                   (int, format_fmt_int),                                    \
+	                                   (short, format_fmt_short),                                \
+	                                   (signed char, format_fmt_signed_char),                    \
+	                                   (unsigned long long, format_fmt_unsigned_long_long),      \
+	                                   (unsigned long, format_fmt_unsigned_long),                \
+	                                   (unsigned int, format_fmt_unsigned_int),                  \
+	                                   (unsigned short, format_fmt_unsigned_short),              \
+	                                   (unsigned char, format_fmt_unsigned_char),                \
+	                                   (float, format_fmt_float),                                \
+	                                   (double, format_fmt_double),                              \
+	                                   (char, format_fmt_char),                                  \
+	                                   (const char*, format_fmt_str),                            \
+	                                   (const char[], format_fmt_str),                           \
+	                                   (char*, format_fmt_str),                                  \
+	                                   (char[], format_fmt_str))))
 
-#define FORMAT__MAPPER(N, ARG)                                                                   \
-	FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__MAPPER_TRIPLET ARG)(                        \
-	  FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(((struct format_arg){                                \
-	    .type = kFormatScalar,                                                                   \
-	    .formatter = FORMAT__SELECT(0, FORMAT__ARG_EXPAND(ARG)),                                 \
-	    .data = 0 }))(FORMAT__MAPPER_DEFAULT(N, FORMAT__SELECT(1, FORMAT__ARG_EXPAND(ARG))))),
+#define FORMAT__FORMATTER_TRIPLET_COLLECTION(X, Y)                                               \
+	format_arg__.type = kFormatCollection;                                                       \
+	format_arg__.collection = (X);                                                               \
+	assert(format_arg__.collection.next != NULL);                                                \
+	assert(format_arg__.collection.width != NULL);                                               \
+	assert(format_arg__.collection.formatter != NULL);                                           \
+	format_arg__.data = (uintptr_t)(Y);
+#define FORMAT__FORMATTER_TRIPLET(TAG, X, Y) FORMAT__CAT(FORMAT__FORMATTER_TRIPLET_, TAG)(X, Y)
 
-#define FORMAT__SET_COLLECTION(N, X, Y)                                                          \
-	{                                                                                            \
-		args[N].data = (uintptr_t)(Y);                                                           \
-	}
-#define FORMAT__SET_TRIPLET_(N, TAG, X, Y) FORMAT__CAT(FORMAT__SET_, TAG)(N, X, Y)
+#define FORMAT__MAPPER_VALUE(ARG)                                                                \
+	FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__SELECT(2, FORMAT__EXPAND ARG))(             \
+	  FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(FORMAT__SELECT(1, FORMAT__EXPAND ARG))(ARG))
 
-#define FORMAT__IS_POINTER_VAR_P(VAR)                                                            \
-	(__builtin_types_compatible_p(const void*, typeof(VAR)) ||                                   \
-	 __builtin_types_compatible_p(char*, typeof(VAR)) ||                                         \
-	 __builtin_types_compatible_p(const char*, typeof(VAR)) ||                                   \
-	 __builtin_types_compatible_p(char[], typeof(VAR)) ||                                        \
-	 __builtin_types_compatible_p(const char[], typeof(VAR)))
-
-#define FORMAT__SET_DEFAULT(N, ARG)                                                              \
-	{                                                                                            \
-		_Static_assert(sizeof(typeof(FORMAT__SELECT(1, FORMAT__ARG_EXPAND(ARG)))) <=             \
-		                 sizeof(uint64_t),                                                       \
-		               "Invalid argument type");                                                 \
-		if (FORMAT__IS_POINTER_VAR_P(FORMAT__SELECT(1, FORMAT__ARG_EXPAND(ARG)))) {              \
-			args[N].data = (uintptr_t)FORMAT__SELECT(1, FORMAT__ARG_EXPAND(ARG));                \
-		} else {                                                                                 \
-			const typeof(FORMAT__SELECT(1, FORMAT__ARG_EXPAND(ARG))) temp =                      \
-			  FORMAT__SELECT(1, FORMAT__ARG_EXPAND(ARG));                                        \
-			memcpy(&args[N].data, &temp, sizeof(temp));                                          \
-		}                                                                                        \
-	}
-#define FORMAT__SET(N, ARG)                                                                      \
-	FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))                                                     \
-	(FORMAT__SET_TRIPLET_(N,                                                                     \
-	                      FORMAT__SELECT(0, FORMAT__EXPAND ARG),                                 \
-	                      FORMAT__SELECT(1, FORMAT__EXPAND ARG),                                 \
-	                      FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(FORMAT__SET_DEFAULT(N, ARG))
+#define FORMAT__MAPPER(ARG)                                                                      \
+	__extension__({                                                                              \
+		_Static_assert((FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)) ||                   \
+		                sizeof(FORMAT__MAPPER_VALUE(ARG)) <= sizeof(uint64_t)) &&                \
+		               "Cannot format type, did you mean to use a pointer instead?");            \
+		struct format_arg format_arg__;                                                          \
+		format_arg__.type = kFormatScalar;                                                       \
+		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(                                                \
+		  FORMAT__FORMATTER_TRIPLET ARG)(FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(                  \
+		  format_arg__.formatter = FORMAT__SELECT(0, FORMAT__EXPAND ARG))(FORMAT__CHOOSE(ARG))); \
+		FORMAT__IF_ELSE(                                                                         \
+		  FORMAT__IS_TRIPLET(ARG))()(/* respect strict-aliasing */                               \
+		                             assert(format_arg__.formatter != NULL &&                    \
+		                                    "Could not find formatter for argument"));           \
+		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))()((void)__builtin_choose_expr(                  \
+		  FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)),                                   \
+		  __extension__({                                                                        \
+			  format_arg__.data = (uintptr_t)FORMAT__MAPPER_VALUE(ARG);                          \
+			  0;                                                                                 \
+		  }),                                                                                    \
+		  __extension__({                                                                        \
+			  const typeof(FORMAT__MAPPER_VALUE(ARG)) format_temp__ = FORMAT__MAPPER_VALUE(ARG); \
+			  format_arg__.data = 0;                                                            \
+			  memcpy(&format_arg__.data, &format_temp__, sizeof(format_temp__));                 \
+			  0;                                                                                 \
+		  })));                                                                                  \
+		format_arg__;                                                                            \
+	}),
 
 #define format(output, fmt, ...)                                                                 \
 	do {                                                                                         \
@@ -523,20 +527,13 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 		_Static_assert(__builtin_types_compatible_p(typeof(fmt), const char*) ||                 \
 		                 __builtin_types_compatible_p(typeof(fmt), const char[]),                \
 		               "Invalid format string");                                                 \
-		struct format_arg args[] = { FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(             \
-		  FORMAT__EXPAND(FORMAT__EVAL(FORMAT__MAP(0, FORMAT__MAPPER, __VA_ARGS__))))()(          \
-		  struct format_arg){                                                                    \
-		  .type = kFormatScalar, .formatter = NULL, .data = 0 } /* Sentinel */ };                \
-		enum                                                                                     \
-		{                                                                                        \
-			counter_base = __COUNTER__                                                           \
-		};                                                                                       \
-		FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(                                          \
-		  FORMAT__EXPAND(FORMAT__EVAL(FORMAT__MAP(counter_base, FORMAT__SET, __VA_ARGS__))))()   \
-		  format_args(output,                                                                    \
-		              fmt,                                                                       \
-		              (const struct format_env){ .args = args,                                   \
-		                                         .size = sizeof(args) / sizeof(args[0]) - 1 });  \
+		struct format_arg format_args__[] = { FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(    \
+		  FORMAT__EXPAND(FORMAT__EVAL(FORMAT__MAP(FORMAT__MAPPER, __VA_ARGS__))))() };           \
+		format_args(output,                                                                      \
+		            fmt,                                                                         \
+		            (const struct format_env){ .args = format_args__,                            \
+		                                       .size = sizeof(format_args__) /                   \
+		                                               sizeof(format_args__[0]) });              \
 		FORMAT__END_DIAG(clang)                                                                  \
 	} while (0)
 
@@ -603,7 +600,7 @@ format__collection_array_width(struct format_arg_collection* collection,
 	   .state = &(struct format_collection_array_cursor){ .cur = (ARRAY) },                      \
 	   .next = format__collection_array_next,                                                    \
 	   .width = format__collection_array_width,                                                  \
-	   .formatter = FORMAT__MAPPER_DEFAULT(0, *(ARRAY)).formatter,                               \
+	   .formatter = __extension__({ format_fmt_int; }),                                          \
 	   .elem_size = sizeof(*(ARRAY)),                                                            \
 	   .is_pointer = FORMAT__IS_POINTER_VAR_P(*(ARRAY)) }),                                      \
 	 ARRAY)
@@ -620,16 +617,6 @@ format__collection_array_width(struct format_arg_collection* collection,
 
 /**
  * @brief Format macro for arrays
- *
- * \gb{'['} \gt{number, number of elements to display} \gb{']'} <br>
- * \gi{ } \gto{alignment, alignment} <br>
- * \gi{ } \gto{number,width} <br>
- * \gi{ } (\gb{'#'} <br>
- * \gi{ } \gi{ } \gt{spec, start delimiter} <br>
- * \gi{ } \gi{ } \gt{spec, element separator} <br>
- * \gi{ } \gi{ } \gt{spec, end delimiter} <br>
- * \gi{ } )? <br>
- * \gi{ } \gb{':\{'} \gt{expression, format expression for array elements} \gb{'\}'}
  *
  * @param ARRAY Array to format
  * @param ... (optional) Custom formatter for elements in @p ARRAY
@@ -648,8 +635,8 @@ format__collection_array_width(struct format_arg_collection* collection,
  * # Number
  *
  * \gb{number} \gb{ := } \gb{ integer } <i>parse literally from the format string</i> <br>
- * \gi{ } \gi{ } \gb{| '\{' integer '\}'} <i>parse integer and retrieve the corresponding argument in the
- * argument list</i>
+ * \gi{ } \gi{ } \gb{| '\{' integer '\}'} <i>parse integer and retrieve the corresponding argument
+ * in the argument list</i>
  *
  * A number is a positive integer parsed directly from the format string or from the list of
  * arguments.
@@ -664,15 +651,16 @@ format__collection_array_width(struct format_arg_collection* collection,
  * @anchor grammar_size
  * # Size
  *
- * Parsing rules for size are the same as @ref grammar_number "number", except that they are limited to 16384.
- * When referring to *width*, they commonly refer to the number of UTF-8 codepoints, and not the number of bytes.
+ * Parsing rules for size are the same as @ref grammar_number "number", except that they are
+ * limited to 16384. When referring to *width*, they commonly refer to the number of UTF-8
+ * codepoints, and not the number of bytes.
  *
  * @anchor grammar_spec
  * # Specifier
  *
  * \gb{spec} \gb{ := } \gb{ codepoint } <i>parse literally from the format string</i> <br>
- * \gi{ } \gi{ } \gb{| '\{' integer '\}'} <i>parse integer and retrieve the corresponding argument in the
- * argument list</i>
+ * \gi{ } \gi{ } \gb{| '\{' integer '\}'} <i>parse integer and retrieve the corresponding argument
+ * in the argument list</i>
  *
  * A specifier is a literal string that can either be present as a single UTF-8 codepoint in the
  * format string, or a string retrieved from the list of arguments.
@@ -720,8 +708,9 @@ format__collection_array_width(struct format_arg_collection* collection,
  *
  * **Display type** This is a single character that defines how values in the string are printed:
  *  - `s` *(default)* Values are printed as-is.
- *  - `?` Non-printables are displayed using their common escape sequence, for instance `\n` is displayed as `\n` instead of putting a newline.
- *    Other values without a common escape sequence are displayed using the `\xXX` format.
+ *  - `?` Non-printables are displayed using their common escape sequence, for instance `\n` is
+ * displayed as `\n` instead of putting a newline. Other values without a common escape sequence
+ * are displayed using the `\xXX` format.
  *  - `x` Non-printables are displayed using the `0xXX` format.
  *
  * #### Examples
