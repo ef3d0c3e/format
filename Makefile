@@ -34,7 +34,7 @@ build/%.o: %.c
 
 build/tests/%.o: tests/%.c
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -ftrack-macro-expansion=0 $(IFLAGS) -I$(CRITERION_SRC)/include -c $< -o $@
+	$(CC) $(CFLAGS) -ftrack-macro-expansion=2 $(IFLAGS) -I$(CRITERION_SRC)/include -c $< -o $@
 
 # ---------
 # Criterion
@@ -54,7 +54,7 @@ $(CRITERION_PC): $(CRITERION_BUILD)/build.ninja
 
 $(TEST): $(TEST_OBJECTS) $(LIB) $(CRITERION_PC)
 	@mkdir -p $(@D)
-	$(CC) -ftrack-macro-expansion=0 $(CFLAGS) $(IFLAGS) \
+	$(CC) -ftrack-macro-expansion=2 $(CFLAGS) $(IFLAGS) \
 		$$(PKG_CONFIG_PATH=$(CRITERION_PKGCONFIG) pkg-config --static --cflags criterion) \
 		-o $@ \
 		$(TEST_OBJECTS) \
