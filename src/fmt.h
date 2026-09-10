@@ -3,8 +3,6 @@
 
 #define _GNU_SOURCE
 
-#include "buffer.h"
-
 #include <unistd.h>
 #include <errno.h>
 

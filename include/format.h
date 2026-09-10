@@ -336,6 +336,7 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 #define FORMAT__EMPTY()
 #define FORMAT__DEFER1(m) m FORMAT__EMPTY()
 #define FORMAT__DEFER2(m) m FORMAT__EMPTY FORMAT__EMPTY()()
+
 #define FORMAT__EVAL(...) FORMAT__EVAL1024(__VA_ARGS__)
 #define FORMAT__EVAL1024(...) FORMAT__EVAL512(FORMAT__EVAL512(__VA_ARGS__))
 #define FORMAT__EVAL512(...) FORMAT__EVAL256(FORMAT__EVAL256(__VA_ARGS__))
@@ -362,6 +363,19 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 #define FORMAT__EVAL_T2(...) FORMAT__EVAL_T1(FORMAT__EVAL_T1(__VA_ARGS__))
 #define FORMAT__EVAL_T1(...) __VA_ARGS__
 
+#define FORMAT__EVAL_O(...) FORMAT__EVAL_O1024(__VA_ARGS__)
+#define FORMAT__EVAL_O1024(...) FORMAT__EVAL_O512(FORMAT__EVAL_O512(__VA_ARGS__))
+#define FORMAT__EVAL_O512(...) FORMAT__EVAL_O256(FORMAT__EVAL_O256(__VA_ARGS__))
+#define FORMAT__EVAL_O256(...) FORMAT__EVAL_O128(FORMAT__EVAL_O128(__VA_ARGS__))
+#define FORMAT__EVAL_O128(...) FORMAT__EVAL_O64(FORMAT__EVAL_O64(__VA_ARGS__))
+#define FORMAT__EVAL_O64(...) FORMAT__EVAL_O32(FORMAT__EVAL_O32(__VA_ARGS__))
+#define FORMAT__EVAL_O32(...) FORMAT__EVAL_O16(FORMAT__EVAL_O16(__VA_ARGS__))
+#define FORMAT__EVAL_O16(...) FORMAT__EVAL_O8(FORMAT__EVAL_O8(__VA_ARGS__))
+#define FORMAT__EVAL_O8(...) FORMAT__EVAL_O4(FORMAT__EVAL_O4(__VA_ARGS__))
+#define FORMAT__EVAL_O4(...) FORMAT__EVAL_O2(FORMAT__EVAL_O2(__VA_ARGS__))
+#define FORMAT__EVAL_O2(...) FORMAT__EVAL_O1(FORMAT__EVAL_O1(__VA_ARGS__))
+#define FORMAT__EVAL_O1(...) __VA_ARGS__
+
 #define FORMAT__CAR(a, ...) a
 #define FORMAT__CDR(a, ...) __VA_ARGS__
 #define FORMAT__CDR2(...) FORMAT__CDR(__VA_ARGS__)
@@ -385,6 +399,8 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 
 #define FORMAT___CAT(a, b) a##b
 #define FORMAT__CAT(a, b) FORMAT___CAT(a, b)
+#define FORMAT___STRINGIFY(x) #x
+#define FORMAT__STRINGIFY(x) FORMAT___STRINGIFY(x)
 
 #define FORMAT___MAP() FORMAT__MAP
 #define FORMAT__MAP(__m, __first, ...)                                                           \
@@ -451,8 +467,6 @@ _Static_assert(!FORMAT__IS_TRIPLET((0, 1, 2, 4)));
 #define FORMAT__IS_POINTER_VAR_P(VAR)                                                            \
 	(__builtin_classify_type(VAR) == __builtin_classify_type((void*)0))
 
-/* ---- 1. GET nth element of a tuple ---- */
-
 #define FORMAT___SELECT__GET_0(a0, ...) a0
 #define FORMAT___SELECT__GET_1(a0, a1, ...) a1
 #define FORMAT___SELECT__GET_2(a0, a1, a2, ...) a2
@@ -462,15 +476,12 @@ _Static_assert(!FORMAT__IS_TRIPLET((0, 1, 2, 4)));
 #define FORMAT___SELECT__GET_6(a0, a1, a2, a3, a4, a5, a6, ...) a6
 #define FORMAT___SELECT__GET_7(a0, a1, a2, a3, a4, a5, a6, a7, ...) a7
 #define FORMAT___SELECT_GET(n, tuple) FORMAT__CAT(FORMAT___SELECT__GET_, n) tuple
-/* extend if you need wider tuples */
 
-/* ---- 2. Count args passed to SELECT ---- */
 #define FORMAT___SELECT_NARG(...) FORMAT___SELECT__NARG(__VA_ARGS__, FORMAT___SELECT_RSEQ_N())
 #define FORMAT___SELECT__NARG(...) FORMAT__EXPAND(FORMAT___SELECT_ARG_N(__VA_ARGS__))
 #define FORMAT___SELECT_ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, N, ...) N
 #define FORMAT___SELECT_RSEQ_N() 8, 7, 6, 5, 4, 3, 2, 1, 0
 
-/* ---- 3. One macro per arity: fold indices left-to-right into the tuple ---- */
 #define FORMAT___SELECT_2(N, T) FORMAT___SELECT_GET(N, T)
 #define FORMAT___SELECT_3(N1, N2, T) FORMAT___SELECT_GET(N2, FORMAT___SELECT_GET(N1, T))
 #define FORMAT___SELECT_4(N1, N2, N3, T)                                                         \
@@ -499,37 +510,62 @@ _Static_assert(!FORMAT__IS_TRIPLET((0, 1, 2, 4)));
 	      N5,                                                                                    \
 	      FORMAT___SELECT_GET(                                                                   \
 	        N4, FORMAT___SELECT_GET(N3, FORMAT___SELECT_GET(N2, FORMAT___SELECT_GET(N1, T)))))))
-/* extend the same way for more indices */
 
-/* ---- top level ---- */
 #define FORMAT__SELECT(...)                                                                      \
 	FORMAT__EXPAND(FORMAT__CAT(FORMAT___SELECT_, FORMAT___SELECT_NARG(__VA_ARGS__))(__VA_ARGS__))
 
-/* ---- sanity-check the primitive ---- */
 _Static_assert(FORMAT___SELECT_GET(0, (7, 8, 9)) == 7);
 _Static_assert(FORMAT___SELECT_GET(1, (7, 8, 9)) == 8);
 _Static_assert(FORMAT___SELECT_GET(2, (7, 8, 9)) == 9);
 
-/* ---- SELECT__2 : SELECT(N, tuple) ---- */
 _Static_assert(FORMAT__SELECT(0, (10, 20, 30, 40)) == 10);
 _Static_assert(FORMAT__SELECT(1, (10, 20, 30, 40)) == 20);
 _Static_assert(FORMAT__SELECT(2, (10, 20, 30, 40)) == 30);
 _Static_assert(FORMAT__SELECT(3, (10, 20, 30, 40)) == 40);
 
-/* ---- SELECT__3 : SELECT(N1, N2, tuple), matches your worked example ---- */
-/* SELECT(1, 0, (A, (B, C))) -> SELECT(0, (B, C)) -> B, done with ints: */
 _Static_assert(FORMAT__SELECT(1, 0, (100, (200, 300))) == 200);
 _Static_assert(FORMAT__SELECT(1, 1, (100, (200, 300))) == 300);
 _Static_assert(FORMAT__SELECT(0, 0, ((1, 2), (3, 4))) == 1);
 _Static_assert(FORMAT__SELECT(0, 1, ((1, 2), (3, 4))) == 2);
 
-/* ---- SELECT__4 : SELECT(N1, N2, N3, tuple), 3 levels deep ---- */
 _Static_assert(FORMAT__SELECT(1, 1, 0, (1, (2, (3, 4)))) == 3);
 _Static_assert(FORMAT__SELECT(1, 1, 1, (1, (2, (3, 4)))) == 4);
 
-/* ---- SELECT__5 : SELECT(N1, N2, N3, N4, tuple), 4 levels deep ---- */
 _Static_assert(FORMAT__SELECT(1, 1, 1, 0, (1, (2, (3, (4, 5))))) == 4);
 _Static_assert(FORMAT__SELECT(1, 1, 1, 1, (1, (2, (3, (4, 5))))) == 5);
+
+#define FORMAT___HAS_ARG_0 (0, 0, 0, 0, 0, 0, 0, 0)
+#define FORMAT___HAS_ARG_1 (1, 0, 0, 0, 0, 0, 0, 0)
+#define FORMAT___HAS_ARG_2 (1, 1, 0, 0, 0, 0, 0, 0)
+#define FORMAT___HAS_ARG_3 (1, 1, 1, 0, 0, 0, 0, 0)
+#define FORMAT___HAS_ARG_4 (1, 1, 1, 1, 0, 0, 0, 0)
+#define FORMAT___HAS_ARG_5 (1, 1, 1, 1, 1, 0, 0, 0)
+#define FORMAT___HAS_ARG_6 (1, 1, 1, 1, 1, 1, 0, 0)
+#define FORMAT___HAS_ARG_7 (1, 1, 1, 1, 1, 1, 1, 0)
+#define FORMAT___HAS_ARG_8 (1, 1, 1, 1, 1, 1, 1, 1)
+
+#define FORMAT__HAS_ARG(N, ...)                                                                  \
+	FORMAT___SELECT_GET(N, FORMAT__CAT(FORMAT___HAS_ARG_, FORMAT___SELECT_NARG(__VA_ARGS__)))
+
+_Static_assert(!FORMAT__HAS_ARG(3));
+
+_Static_assert(FORMAT__HAS_ARG(0, 42));
+_Static_assert(!FORMAT__HAS_ARG(1, 42));
+
+_Static_assert(FORMAT__HAS_ARG(0, 1, 2, 3));
+_Static_assert(FORMAT__HAS_ARG(1, 1, 2, 3));
+_Static_assert(FORMAT__HAS_ARG(2, 1, 2, 3));
+_Static_assert(!FORMAT__HAS_ARG(3, 1, 2, 3));
+_Static_assert(!FORMAT__HAS_ARG(7, 1, 2, 3));
+
+_Static_assert(FORMAT__HAS_ARG(7, 0, 1, 2, 3, 4, 5, 6, 7));
+_Static_assert(!FORMAT__HAS_ARG(7, 0, 1, 2, 3, 4, 5, 6));
+
+_Static_assert(FORMAT__HAS_ARG(1, (1, 2), (3, 4)));
+_Static_assert(!FORMAT__HAS_ARG(2, (1, 2), (3, 4)));
+_Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
+
+/** @} */
 
 #define FORMAT__MAPPER_CHOOSE(ARG, RULE)                                                         \
 	__builtin_choose_expr(__builtin_types_compatible_p(FORMAT__SELECT(0, RULE), typeof(ARG)),    \
@@ -559,8 +595,8 @@ _Static_assert(FORMAT__SELECT(1, 1, 1, 1, (1, (2, (3, (4, 5))))) == 5);
 
 #define FORMAT__FORMATTER_TRIPLET_COLLECTION(DATA, FIELD)                                        \
 	format_arg__.type = kFormatCollection;                                                       \
-	typeof(*FIELD)* format_arg_triplet__ = FIELD;                                      \
-    (void)format_arg_triplet__; \
+	typeof(*FIELD)* format_arg_triplet__ = FIELD;                                                \
+	(void)format_arg_triplet__;                                                                  \
 	format_arg__.collection = (DATA);                                                            \
 	assert(format_arg__.collection.next != NULL);                                                \
 	assert(format_arg__.collection.width != NULL);                                               \
@@ -620,8 +656,6 @@ _Static_assert(FORMAT__SELECT(1, 1, 1, 1, (1, (2, (3, (4, 5))))) == 5);
 		                                               sizeof(format_args__[0]) });              \
 		FORMAT__END_DIAG(clang)                                                                  \
 	} while (0)
-
-/** @} */
 
 /**
  * @defgroup CustomFormat Custom formatters
@@ -856,52 +890,42 @@ format__collection_array_width(struct format_arg_collection* collection,
  * @}
  */
 
-#define FORMAT__EVAL_O(...) FORMAT__EVAL_O1024(__VA_ARGS__)
-#define FORMAT__EVAL_O1024(...) FORMAT__EVAL_O512(FORMAT__EVAL_O512(__VA_ARGS__))
-#define FORMAT__EVAL_O512(...) FORMAT__EVAL_O256(FORMAT__EVAL_O256(__VA_ARGS__))
-#define FORMAT__EVAL_O256(...) FORMAT__EVAL_O128(FORMAT__EVAL_O128(__VA_ARGS__))
-#define FORMAT__EVAL_O128(...) FORMAT__EVAL_O64(FORMAT__EVAL_O64(__VA_ARGS__))
-#define FORMAT__EVAL_O64(...) FORMAT__EVAL_O32(FORMAT__EVAL_O32(__VA_ARGS__))
-#define FORMAT__EVAL_O32(...) FORMAT__EVAL_O16(FORMAT__EVAL_O16(__VA_ARGS__))
-#define FORMAT__EVAL_O16(...) FORMAT__EVAL_O8(FORMAT__EVAL_O8(__VA_ARGS__))
-#define FORMAT__EVAL_O8(...) FORMAT__EVAL_O4(FORMAT__EVAL_O4(__VA_ARGS__))
-#define FORMAT__EVAL_O4(...) FORMAT__EVAL_O2(FORMAT__EVAL_O2(__VA_ARGS__))
-#define FORMAT__EVAL_O2(...) FORMAT__EVAL_O1(FORMAT__EVAL_O1(__VA_ARGS__))
-#define FORMAT__EVAL_O1(...) __VA_ARGS__
-
-#define FORMAT___STRINGIFY(x) #x
-#define FORMAT__STRINGIFY(x) FORMAT___STRINGIFY(x)
-
-#define FORMAT__EXPAND3(...) __VA_ARGS__
-#define FORMAT__EXPAND4(...) __VA_ARGS__
-#define FORMAT__EXPAND5(...) __VA_ARGS__
-#define FORMAT__EXPAND6(...) __VA_ARGS__
-
 #define FORMAT__OBJ_MAPPER_S(N, CONST, ARG)                                                      \
 	format(output,                                                                               \
-	       "{:>{1}}{2} = {3:" FORMAT__SELECT(1, ARG) "},\n",                                     \
+	       "{:>{1}}{2} = ",                                                                      \
 	       "",                                                                                   \
 	       4 * FORMAT__SELECT(0, CONST),                                                         \
-	       FORMAT__STRINGIFY(FORMAT__SELECT(0, ARG)),                                            \
-	       val->FORMAT__SELECT(0, ARG));
+	       FORMAT__STRINGIFY(FORMAT__SELECT(0, ARG)));                                           \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
+	(format(output,                                                                              \
+	        "{0:" FORMAT__SELECT(0, ARG) "},\n",                                                 \
+	        FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG),                                           \
+	        FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                             \
+	  format(output,                                                                             \
+	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
+	         FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG)));
 
 #define FORMAT__OBJ_MAPPER_P(N, CONST, ARG, FORMATTER, FIELD)                                    \
-	format(output,                                                                               \
-	       "{:>{1}}{2} = {3:" FORMAT__SELECT(1, ARG) "},\n",                                     \
-	       "",                                                                                   \
-	       4 * FORMAT__SELECT(0, CONST),                                                         \
-	       FORMAT__STRINGIFY(FIELD),                                                             \
-	       (FORMATTER, val->FIELD));
+	format(output, "{:>{1}}{2} = ", "", 4 * FORMAT__SELECT(0, CONST), FORMAT__STRINGIFY(FIELD)); \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
+	(format(output,                                                                              \
+	        "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                 \
+	        (FORMATTER, FORMAT_OBJ_STRUCT->FIELD),                                               \
+	        FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                             \
+	  format(                                                                                    \
+	    output, "{0:" FORMAT__SELECT(1, ARG) "},\n", (FORMATTER, FORMAT_OBJ_STRUCT->FIELD)));
 
 #define FORMAT__OBJ_MAPPER_T(N, CONST, ARG, TAG, DATA, FIELD)                                    \
-	typeof(*val->FIELD)* format_arg_triplet__ = val->FIELD;                                      \
-    (void)format_arg_triplet__; \
-	format(output,                                                                               \
-	       "{:>{1}}{2} = {3:" FORMAT__SELECT(1, ARG) "},\n",                                     \
-	       "",                                                                                   \
-	       4 * FORMAT__SELECT(0, CONST),                                                         \
-	       FORMAT__STRINGIFY(FIELD),                                                             \
-	       (TAG, DATA, val->FIELD));
+	typeof(*FORMAT_OBJ_STRUCT->FIELD)* format_arg_triplet__ = FORMAT_OBJ_STRUCT->FIELD;          \
+	(void)format_arg_triplet__;                                                                  \
+	format(output, "{:>{1}}{2} = ", "", 4 * FORMAT__SELECT(0, CONST), FORMAT__STRINGIFY(FIELD)); \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, FORMAT__EXPAND ARG))(                                     \
+	  format(output,                                                                             \
+	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
+	         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD),                                              \
+	         FORMAT__SELECT(2, ARG)))(format(output,                                             \
+	                                         "{0:" FORMAT__SELECT(1, ARG) "},\n",                \
+	                                         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD)));
 
 #define FORMAT__OBJ_MAPPER(N, CONST, ARG)                                                        \
 	FORMAT__IF_ELSE(FORMAT__IS_PAIR(FORMAT__SELECT(0, ARG)))(                                    \
@@ -933,24 +957,19 @@ format__collection_array_width(struct format_arg_collection* collection,
 	        const struct format_env* env,                                                        \
 	        size_t idx)                                                                          \
 	{                                                                                            \
-		const TYPE* val = (const TYPE*)env->args[idx].data;                                      \
-		assert(val != NULL && "Cannot format a NULL object");                                    \
+		const TYPE* FORMAT_OBJ_STRUCT = (const TYPE*)env->args[idx].data;                        \
+		assert(FORMAT_OBJ_STRUCT != NULL && "Cannot format a NULL object");                      \
+		size_t format_depth__ = 1;                                                               \
                                                                                                  \
-		static const char* type_name = #TYPE;                                                    \
-		if (format_output_write(output, type_name, strlen(type_name)))                           \
-			return -1;                                                                           \
-		if (format_output_write(output, " {\n", 3))                                              \
-			return -1;                                                                           \
-                                                                                                 \
+		format(output, "{0:>{1}}{2} {{\n", "", 4 * (format_depth__ - 1), #TYPE);                  \
 		enum                                                                                     \
 		{                                                                                        \
 			counter_base = __COUNTER__                                                           \
 		};                                                                                       \
-		FORMAT__EXPAND2(FORMAT__EVAL_O(                                                          \
-		  FORMAT__MAP_CONST_N(counter_base, FORMAT__OBJ_MAPPER, (1), __VA_ARGS__)))              \
+		FORMAT__EXPAND(FORMAT__EVAL_O(                                                          \
+		  FORMAT__MAP_CONST_N(counter_base, FORMAT__OBJ_MAPPER, (format_depth__), __VA_ARGS__))) \
                                                                                                  \
-		if (format_output_write(output, "}\n", 2))                                               \
-			return -1;                                                                           \
+		format(output, "{0:>{1}}}}", "", 4 * (format_depth__ - 1));                             \
 		return 0;                                                                                \
 	}
 
@@ -960,13 +979,14 @@ struct Foo
 	const char* str;
 	long x;
 	int arr[5];
+	size_t len;
 };
 
+#define FORMAT_OBJ_STRUCT format_object__
 FORMAT_OBJ(struct Foo,
            format_foo,
-           ((format_fmt_int, val), "#x"),
-           (str, "#\"\"?"),
-           (x, ""),
-           (FORMAT_ARRAY(arr), "[5]:{}"), )
+           ((format_fmt_int, val), "x"),
+           (val, "b"),
+           (FORMAT_ARRAY(arr), "[{1}]:{}", (FORMAT_OBJ_STRUCT->len)))
 
 #endif // LIBFORMAT_H
