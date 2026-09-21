@@ -5,9 +5,10 @@ Test(fmt_collection, temp)
 	struct format_output out = format_output_file(stdout);
 	struct Foo foo = {
 		.val = 0x64,
-		.str = "Hello, World!",
+		.str = "Hello,\n World!",
 		.x = 123456,
 		.arr = {1,2,3,4,5},
+		.len = 4,
 	};
 	format(&out, "{}", (format_foo, &foo));
 

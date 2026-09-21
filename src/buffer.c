@@ -1,15 +1,27 @@
+/* format -- C formatting library
+ * Copyright (C) 2026 ef3d0c3e
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ * and associated documentation files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #define _GNU_SOURCE
-#include "buffer.h"
+#include <format.h>
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
-
-// Public API
 
 struct format_output
 format_output_fd(int fd)
@@ -185,12 +197,12 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 		}
 
 		/* Allocate buffer */
-		if (unlikely(output->data == NULL)) {
+		if (output->data == NULL) {
 			if (output->malloc)
 				output->data = output->malloc(1024);
 			else
 				output->data = malloc(1024);
-			if (unlikely(output->data == NULL))
+			if (output->data == NULL)
 				return -1;
 			output->capacity = 1024;
 		}
@@ -207,7 +219,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 				const size_t avail = output->capacity - output->size;
 				assert(avail <= len - pos);
 				memcpy(output->data, buf + pos, avail);
-				if (unlikely(format_output_flush(output) == -1))
+				if (format_output_flush(output) == -1)
 					return -1;
 				pos += avail;
 			}
@@ -228,7 +240,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 				output->size += flush_point;
 				pos += flush_point;
 				/* Flush so all complete lines appear */
-				if (unlikely(format_output_flush(output) == -1))
+				if (format_output_flush(output) == -1)
 					return -1;
 				/* Copy leftover */
 				memcpy(output->data, buf + pos, len - pos);
@@ -285,7 +297,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 			} else {
 				output->data = realloc(output->data, new_cap);
 			}
-			if (unlikely(output->data == NULL)) {
+			if (output->data == NULL) {
 				output->capacity = 0;
 				return -1;
 			}

@@ -1,4 +1,26 @@
+/* format -- C formatting library
+ * Copyright (C) 2026 ef3d0c3e
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ * and associated documentation files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #include "fmt.h"
+
+/**
+ * @file fmt_str.c
+ * @brief String formatting
+ */
 
 struct string_spec
 {
@@ -36,7 +58,7 @@ static inline struct string_spec
 parse_string_spec(const char* fmt_spec, const struct format_env* env)
 {
 	struct string_spec spec = {
-		.align = '<',                /* Left-aligned by default */
+		.align = '<', /* Left-aligned by default */
 		.width = 0,
 		.quoted = 0,
 		.precision = (size_t)-1, /* Sentinel */
@@ -115,7 +137,6 @@ format_fmt_str(struct format_output* output,
 		i += cp ? cp : 1;
 	}
 
-
 	/* Compute alignment */
 	size_t left = 0, right = 0;
 	switch (spec.align) {
@@ -131,7 +152,7 @@ format_fmt_str(struct format_output* output,
 			left = spec.width > width ? spec.width - width : 0;
 			break;
 		default:
-			__builtin_unreachable();
+			format_unreachable();
 	}
 
 	/* Left spacing */
@@ -177,7 +198,7 @@ format_fmt_str(struct format_output* output,
 						buf[1] = 'r';
 						break;
 					default:
-						__builtin_unreachable();
+						format_unreachable();
 				}
 				if (format_output_write(output, buf, 2))
 					return -1;
@@ -204,7 +225,7 @@ format_fmt_str(struct format_output* output,
 							return -1;
 						break;
 					default:
-						__builtin_unreachable();
+						format_unreachable();
 				}
 			}
 		} else if (cp > 1) {

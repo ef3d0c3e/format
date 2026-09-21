@@ -1,3 +1,20 @@
+/* format -- C formatting library
+ * Copyright (C) 2026 ef3d0c3e
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ * and associated documentation files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #ifndef LIBFORMAT_H
 #define LIBFORMAT_H
 
@@ -7,7 +24,58 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Diagnostic helpers */
+// Format output buffer
+struct format_output;
+
+/**
+ * @defgroup PlatformMacros Platform specific macros
+ * @{
+ */
+
+#if !defined(__has_attribute)
+#error Unsupported compiler
+#endif // __has_attribute
+
+/** @brief `format_unreachable` mark statement as not reachable by the program */
+#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
+#define format_unreachable() __builtin_unreachable()
+#elif defined(__clang__) && (__clang_major__ >= 15)
+#define format_unreachable() __builtin_unreachable()
+#else
+#warning Disabling format_unreachable
+#define format_unreachable()                                                                     \
+	do {                                                                                         \
+	} while (0)
+#endif
+
+/** @brief `format_nonnull` null checks */
+#if __has_attribute(nonnull)
+#define format_nonnull(...) __attribute__((nonnull(__VA_ARGS__)))
+#else
+#warning Disabling format_nonnull
+#define format_nonnull(...)
+#endif
+
+/** @brief `format_returns_nonnull` ensure function returns non-NULL */
+#if __has_attribute(returns_nonnull)
+#define format_returns_nonnull __attribute__((returns_nonnull))
+#else
+#warning Disabling format_returns_nonnull
+#define format_returns_nonnull
+#endif
+
+/** @brief `format_warn_unused_result` warn if function result is unused */
+#if __has_attribute(warn_unused_result)
+#define format_warn_unused_result __attribute__((warn_unused_result))
+#else
+#warning Disabling format_warn_unused_result
+#define format_warn_unused_result
+#endif
+
+/**
+ * @defgroup DiagnosticMacros Macros for diagnostics
+ * @{
+ */
 #define FORMAT___DO_PRAGMA_(x) _Pragma(#x)
 #define FORMAT___DO_PRAGMA(x) FORMAT___DO_PRAGMA_(x)
 #if defined(__GNUC__) && !defined(__clang__)
@@ -33,9 +101,9 @@
 #define FORMAT__START_DIAG(target) FORMAT___START_DIAG_##target
 #define FORMAT__DIAG(target, diagnostic) FORMAT___DIAG_##target(diagnostic)
 #define FORMAT__END_DIAG(target) FORMAT___END_DIAG_##target
+/** @} */
 
-// Format output buffer
-struct format_output;
+/** @} */
 
 /**
  * @defgroup Style Format style
@@ -157,6 +225,19 @@ struct format_arg
  * @{
  */
 
+/**
+ * @class format_output
+ * @brief Store data for output
+ *
+ * @warn Do not attempt to create or edit this struct by yourself, use the `format_output_*`
+ * functions instead.
+ *
+ * This struct holds the following:
+ *  - Current style information: fg, bg, text style
+ *  - Buffer content (if enabled) and flush strategy
+ *  - Output destination: FILE*, fd or internal buffer
+ *  - Custom allocators
+ */
 struct format_output
 {
 	/** @brief Foreground color */
@@ -184,8 +265,6 @@ struct format_output
 	void* (*malloc)(size_t);
 	void (*free)(void*, size_t);
 	void* (*realloc)(void*, size_t, size_t);
-
-	// TODO: Store target color/style rendering data
 };
 
 /**
@@ -195,7 +274,7 @@ struct format_output
  *
  * @return A new @ref format_output that will output to @p fd
  */
-struct format_output
+struct format_output format_warn_unused_result
 format_output_fd(int fd);
 /**
  * @brief Create a new @ref format_output from a stdio's `FILE` pointer
@@ -204,14 +283,14 @@ format_output_fd(int fd);
  *
  * @return A new @ref format_output that will output to @p file
  */
-struct format_output
-format_output_file(FILE* file);
+struct format_output format_warn_unused_result
+format_output_file(FILE* file) format_nonnull(1);
 /**
  * @brief Create a new @ref format_output to output to it's internal buffer
  *
  * @return A new @ref format_output that will store output bytes
  */
-struct format_output
+struct format_output format_warn_unused_result
 format_output_buf(void);
 /**
  * @brief Create a new @ref format_output that keep track of size but does not write anything.
@@ -219,7 +298,7 @@ format_output_buf(void);
  *
  * @return A new @ref format_output that will only store size
  */
-struct format_output
+struct format_output format_warn_unused_result
 format_output_none(void);
 /**
  * @brief Destroy a @ref format_output
@@ -229,7 +308,7 @@ format_output_none(void);
  * @param output Output to destroy
  */
 void
-format_output_destroy(struct format_output* output);
+format_output_destroy(struct format_output* output) format_nonnull(1);
 
 /**
  * @brief Set allocator for the output
@@ -238,12 +317,13 @@ void
 format_output_set_allocator(struct format_output* output,
                             void* (*malloc)(size_t),
                             void (*free)(void*, size_t),
-                            void* (*realloc)(void*, size_t, size_t));
+                            void* (*realloc)(void*, size_t, size_t)) format_nonnull(1, 2, 3, 4);
 /**
  * @brief Set the output flushing mode
  */
 void
-format_output_set_flush(struct format_output* output, enum format_output_flush_mode mode);
+format_output_set_flush(struct format_output* output, enum format_output_flush_mode mode)
+  format_nonnull(1);
 /**
  * @brief Flush the format output to it's underlying file descriptor or `FILE`
  *
@@ -252,7 +332,7 @@ format_output_set_flush(struct format_output* output, enum format_output_flush_m
  * @return `0` on success, `-1` on error and `errno` is set
  */
 int
-format_output_flush(struct format_output* output);
+format_output_flush(struct format_output* output) format_nonnull(1);
 /**
  * @brief Writes raw bytes to the output
  *
@@ -264,8 +344,9 @@ format_output_flush(struct format_output* output);
  *
  * @return 0 on success, -1 on failure
  */
-int
-format_output_write(struct format_output* output, const char* buf, size_t len);
+int format_warn_unused_result
+format_output_write(struct format_output* output, const char* buf, size_t len)
+  format_nonnull(1, 2);
 
 /** @} */
 
@@ -274,6 +355,36 @@ format_output_write(struct format_output* output, const char* buf, size_t len);
  * @{
  */
 
+/**
+ * @brief Format a `long long` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_long_long(struct format_output* output,
+                     const char* fmt_spec,
+                     const struct format_env* env,
+                     size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `unsigned long long` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_unsigned_long_long(struct format_output* output,
+                              const char* fmt_spec,
+                              const struct format_env* env,
+                              size_t idx) format_nonnull(1, 2, 3);
 /**
  * @brief Format a `long` argument
  *
@@ -284,47 +395,167 @@ format_output_write(struct format_output* output, const char* buf, size_t len);
  *
  * @return 0 on success, -1 on errors
  */
-int
+int format_warn_unused_result
 format_fmt_long(struct format_output* output,
                 const char* fmt_spec,
                 const struct format_env* env,
-                size_t idx);
+                size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `unsigned long` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_unsigned_long(struct format_output* output,
+                         const char* fmt_spec,
+                         const struct format_env* env,
+                         size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `int` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_int(struct format_output* output,
+               const char* fmt_spec,
+               const struct format_env* env,
+               size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `unsigned int` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_unsigned_int(struct format_output* output,
+                        const char* fmt_spec,
+                        const struct format_env* env,
+                        size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `short` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_short(struct format_output* output,
+                 const char* fmt_spec,
+                 const struct format_env* env,
+                 size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `unsigned short` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_unsigned_short(struct format_output* output,
+                          const char* fmt_spec,
+                          const struct format_env* env,
+                          size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `signed char` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_signed_char(struct format_output* output,
+                       const char* fmt_spec,
+                       const struct format_env* env,
+                       size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `unsigned char` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_unsigned_char(struct format_output* output,
+                         const char* fmt_spec,
+                         const struct format_env* env,
+                         size_t idx) format_nonnull(1, 2, 3);
 
-// TEMP
-int
-format_fmt_long_long(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_int(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_short(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_char(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_unsigned_long_long(struct format_output*,
-                              const char*,
-                              const struct format_env*,
-                              size_t);
-int
-format_fmt_unsigned_long(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_unsigned_int(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_unsigned_short(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_signed_char(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_unsigned_char(struct format_output*, const char*, const struct format_env*, size_t);
+/**
+ * @brief Format a `char` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_char(struct format_output* output,
+                const char* fmt_spec,
+                const struct format_env* env,
+                size_t idx) format_nonnull(1, 2, 3);
+/**
+ * @brief Format a `const char*` argument
+ *
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
+ *
+ * @return 0 on success, -1 on errors
+ */
+int format_warn_unused_result
+format_fmt_str(struct format_output* output,
+               const char* fmt_spec,
+               const struct format_env* env,
+               size_t idx) format_nonnull(1, 2, 3);
+
 int
 format_fmt_float(struct format_output*, const char*, const struct format_env*, size_t);
 int
 format_fmt_double(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_str(struct format_output*, const char*, const struct format_env*, size_t);
 
 /** @} */
 
-void
-format_args(struct format_output* output, const char* fmt, const struct format_env env);
+/**
+ * @brief Format arguments
+ *
+ * @param output Output buffer
+ * @param fmt Format string
+ * @param env Format arguments
+ *
+ * @return 0 on success, -1 on failure
+ */
+int format_warn_unused_result
+format_args(struct format_output* output, const char* fmt, const struct format_env env)
+  format_nonnull(1, 2);
 
 /**
  * @defgroup Macros Helper macros
@@ -638,8 +869,19 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		format_arg__;                                                                            \
 	}),
 
+/**
+ * @brief Formatting function
+ *
+ * This macro is to be invoked like a function
+ *
+ * @param output Output buffer (pointer)
+ * @param fmt Format string
+ * @param ... Format arguments
+ *
+ * @return The result of @ref format_args: 0 on success, -1 on errors
+ */
 #define format(output, fmt, ...)                                                                 \
-	do {                                                                                         \
+	__extension__ ({                                                                                           \
 		FORMAT__START_DIAG(clang)                                                                \
 		FORMAT__DIAG(clang, ignored "-Wc2y-extensions")                                          \
 		_Static_assert(__builtin_types_compatible_p(typeof(output), struct format_output*),      \
@@ -649,13 +891,14 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		               "Invalid format string");                                                 \
 		struct format_arg format_args__[] = { FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(    \
 		  FORMAT__EXPAND(FORMAT__EVAL(FORMAT__MAP(FORMAT__MAPPER, __VA_ARGS__))))() };           \
-		format_args(output,                                                                      \
-		            fmt,                                                                         \
-		            (const struct format_env){ .args = format_args__,                            \
-		                                       .size = sizeof(format_args__) /                   \
-		                                               sizeof(format_args__[0]) });              \
+		int result_ = format_args(                                                               \
+		  output,                                                                                \
+		  fmt,                                                                                   \
+		  (const struct format_env){                                                             \
+		    .args = format_args__, .size = sizeof(format_args__) / sizeof(format_args__[0]) });  \
 		FORMAT__END_DIAG(clang)                                                                  \
-	} while (0)
+		result_;                                                                                 \
+	})
 
 /**
  * @defgroup CustomFormat Custom formatters
@@ -744,6 +987,105 @@ format__collection_array_width(struct format_arg_collection* collection,
 	  FORMAT__ARRAY_0(ARRAY))
 
 /** @} */
+
+#define FORMAT__OBJ_MAPPER_S(N, CONST, ARG)                                                      \
+	format(output,                                                                               \
+	       "{:>{1}}{2} = ",                                                                      \
+	       "",                                                                                   \
+	       4 * FORMAT__SELECT(0, CONST),                                                         \
+	       FORMAT__STRINGIFY(FORMAT__SELECT(0, ARG)));                                           \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
+	(format(output,                                                                              \
+	        "{0:" FORMAT__SELECT(0, ARG) "},\n",                                                 \
+	        FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG),                                           \
+	        FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                             \
+	  format(output,                                                                             \
+	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
+	         FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG)));
+
+#define FORMAT__OBJ_MAPPER_P(N, CONST, ARG, FORMATTER, FIELD)                                    \
+	format(output, "{:>{1}}{2} = ", "", 4 * FORMAT__SELECT(0, CONST), FORMAT__STRINGIFY(FIELD)); \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
+	(format(output,                                                                              \
+	        "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                 \
+	        (FORMATTER, FORMAT_OBJ_STRUCT->FIELD),                                               \
+	        FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                             \
+	  format(                                                                                    \
+	    output, "{0:" FORMAT__SELECT(1, ARG) "},\n", (FORMATTER, FORMAT_OBJ_STRUCT->FIELD)));
+
+#define FORMAT__OBJ_MAPPER_T(N, CONST, ARG, TAG, DATA, FIELD)                                    \
+	typeof(*FORMAT_OBJ_STRUCT->FIELD)* format_arg_triplet__ = FORMAT_OBJ_STRUCT->FIELD;          \
+	(void)format_arg_triplet__;                                                                  \
+	format(output, "{:>{1}}{2} = ", "", 4 * FORMAT__SELECT(0, CONST), FORMAT__STRINGIFY(FIELD)); \
+	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, FORMAT__EXPAND ARG))(                                     \
+	  format(output,                                                                             \
+	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
+	         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD),                                              \
+	         FORMAT__SELECT(2, ARG)))(format(output,                                             \
+	                                         "{0:" FORMAT__SELECT(1, ARG) "},\n",                \
+	                                         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD)));
+
+#define FORMAT__OBJ_MAPPER(N, CONST, ARG)                                                        \
+	FORMAT__IF_ELSE(FORMAT__IS_PAIR(FORMAT__SELECT(0, ARG)))(                                    \
+	  FORMAT__OBJ_MAPPER_P(N, CONST, ARG, FORMAT__SELECT(0, 0, ARG), FORMAT__SELECT(0, 1, ARG)   \
+                                                                                                 \
+	                         ))(                                                                 \
+	  FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(FORMAT__SELECT(0, ARG)))(                               \
+	    FORMAT__OBJ_MAPPER_T(N,                                                                  \
+		                     CONST,                                                              \
+		                     ARG,                                                                \
+		                     FORMAT__SELECT(0, 0, ARG),                                          \
+		                     FORMAT__SELECT(0, 1, ARG),                                          \
+		                     FORMAT__SELECT(0, 2, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, ARG)))
+
+#define FORMAT__OBJ_MAPPER_(N, CONST, ARG)                                                       \
+	{ FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(FORMAT__OBJ_MAPPER_P(                                \
+	  N, CONST, ARG, FORMAT__SELECT(0, 0, ARG), FORMAT__SELECT(0, 1, ARG)))(                     \
+	  FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__OBJ__MAPPER_T(                            \
+		N,                                                                                       \
+		CONST,                                                                                   \
+		ARG,                                                                                     \
+		FORMAT__SELECT(0, 0, ARG),                                                               \
+		FORMAT__SELECT(1, ARG),                                                                  \
+		FORMAT__SELECT(0, 1, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, (ARG)))) }
+
+#define FORMAT_OBJ(TYPE, FUN, ...)                                                               \
+	int FUN(struct format_output* output,                                                        \
+	        const char* fmt_spec,                                                                \
+	        const struct format_env* env,                                                        \
+	        size_t idx)                                                                          \
+	{                                                                                            \
+		const TYPE* FORMAT_OBJ_STRUCT = (const TYPE*)env->args[idx].data;                        \
+		assert(FORMAT_OBJ_STRUCT != NULL && "Cannot format a NULL object");                      \
+		size_t format_depth__ = 1;                                                               \
+                                                                                                 \
+		format(output, "{0:>{1}}{2} {{\n", "", 4 * (format_depth__ - 1), #TYPE);                 \
+		enum                                                                                     \
+		{                                                                                        \
+			counter_base = __COUNTER__                                                           \
+		};                                                                                       \
+		FORMAT__EXPAND(FORMAT__EVAL_O(                                                           \
+		  FORMAT__MAP_CONST_N(counter_base, FORMAT__OBJ_MAPPER, (format_depth__), __VA_ARGS__))) \
+                                                                                                 \
+		format(output, "{0:>{1}}}}", "", 4 * (format_depth__ - 1));                              \
+		return 0;                                                                                \
+	}
+
+struct Foo
+{
+	int val;
+	const char* str;
+	long x;
+	int arr[5];
+	size_t len;
+};
+
+#define FORMAT_OBJ_STRUCT format_object__
+FORMAT_OBJ(struct Foo,
+           format_foo,
+           ((format_fmt_int, val), "x"),
+           (val, "b"),
+           (FORMAT_ARRAY(arr), "[{1}]:{}", (FORMAT_OBJ_STRUCT->len)))
 
 /**
  * @defgroup Grammar Format expression grammar
@@ -889,104 +1231,5 @@ format__collection_array_width(struct format_arg_collection* collection,
  *
  * @}
  */
-
-#define FORMAT__OBJ_MAPPER_S(N, CONST, ARG)                                                      \
-	format(output,                                                                               \
-	       "{:>{1}}{2} = ",                                                                      \
-	       "",                                                                                   \
-	       4 * FORMAT__SELECT(0, CONST),                                                         \
-	       FORMAT__STRINGIFY(FORMAT__SELECT(0, ARG)));                                           \
-	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
-	(format(output,                                                                              \
-	        "{0:" FORMAT__SELECT(0, ARG) "},\n",                                                 \
-	        FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG),                                           \
-	        FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                             \
-	  format(output,                                                                             \
-	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
-	         FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG)));
-
-#define FORMAT__OBJ_MAPPER_P(N, CONST, ARG, FORMATTER, FIELD)                                    \
-	format(output, "{:>{1}}{2} = ", "", 4 * FORMAT__SELECT(0, CONST), FORMAT__STRINGIFY(FIELD)); \
-	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
-	(format(output,                                                                              \
-	        "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                 \
-	        (FORMATTER, FORMAT_OBJ_STRUCT->FIELD),                                               \
-	        FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                             \
-	  format(                                                                                    \
-	    output, "{0:" FORMAT__SELECT(1, ARG) "},\n", (FORMATTER, FORMAT_OBJ_STRUCT->FIELD)));
-
-#define FORMAT__OBJ_MAPPER_T(N, CONST, ARG, TAG, DATA, FIELD)                                    \
-	typeof(*FORMAT_OBJ_STRUCT->FIELD)* format_arg_triplet__ = FORMAT_OBJ_STRUCT->FIELD;          \
-	(void)format_arg_triplet__;                                                                  \
-	format(output, "{:>{1}}{2} = ", "", 4 * FORMAT__SELECT(0, CONST), FORMAT__STRINGIFY(FIELD)); \
-	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, FORMAT__EXPAND ARG))(                                     \
-	  format(output,                                                                             \
-	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
-	         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD),                                              \
-	         FORMAT__SELECT(2, ARG)))(format(output,                                             \
-	                                         "{0:" FORMAT__SELECT(1, ARG) "},\n",                \
-	                                         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD)));
-
-#define FORMAT__OBJ_MAPPER(N, CONST, ARG)                                                        \
-	FORMAT__IF_ELSE(FORMAT__IS_PAIR(FORMAT__SELECT(0, ARG)))(                                    \
-	  FORMAT__OBJ_MAPPER_P(N, CONST, ARG, FORMAT__SELECT(0, 0, ARG), FORMAT__SELECT(0, 1, ARG)   \
-                                                                                                 \
-	                         ))(                                                                 \
-	  FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(FORMAT__SELECT(0, ARG)))(                               \
-	    FORMAT__OBJ_MAPPER_T(N,                                                                  \
-		                     CONST,                                                              \
-		                     ARG,                                                                \
-		                     FORMAT__SELECT(0, 0, ARG),                                          \
-		                     FORMAT__SELECT(0, 1, ARG),                                          \
-		                     FORMAT__SELECT(0, 2, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, ARG)))
-
-#define FORMAT__OBJ_MAPPER_(N, CONST, ARG)                                                       \
-	{ FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(FORMAT__OBJ_MAPPER_P(                                \
-	  N, CONST, ARG, FORMAT__SELECT(0, 0, ARG), FORMAT__SELECT(0, 1, ARG)))(                     \
-	  FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__OBJ__MAPPER_T(                            \
-		N,                                                                                       \
-		CONST,                                                                                   \
-		ARG,                                                                                     \
-		FORMAT__SELECT(0, 0, ARG),                                                               \
-		FORMAT__SELECT(1, ARG),                                                                  \
-		FORMAT__SELECT(0, 1, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, (ARG)))) }
-
-#define FORMAT_OBJ(TYPE, FUN, ...)                                                               \
-	int FUN(struct format_output* output,                                                        \
-	        const char* fmt_spec,                                                                \
-	        const struct format_env* env,                                                        \
-	        size_t idx)                                                                          \
-	{                                                                                            \
-		const TYPE* FORMAT_OBJ_STRUCT = (const TYPE*)env->args[idx].data;                        \
-		assert(FORMAT_OBJ_STRUCT != NULL && "Cannot format a NULL object");                      \
-		size_t format_depth__ = 1;                                                               \
-                                                                                                 \
-		format(output, "{0:>{1}}{2} {{\n", "", 4 * (format_depth__ - 1), #TYPE);                  \
-		enum                                                                                     \
-		{                                                                                        \
-			counter_base = __COUNTER__                                                           \
-		};                                                                                       \
-		FORMAT__EXPAND(FORMAT__EVAL_O(                                                          \
-		  FORMAT__MAP_CONST_N(counter_base, FORMAT__OBJ_MAPPER, (format_depth__), __VA_ARGS__))) \
-                                                                                                 \
-		format(output, "{0:>{1}}}}", "", 4 * (format_depth__ - 1));                             \
-		return 0;                                                                                \
-	}
-
-struct Foo
-{
-	int val;
-	const char* str;
-	long x;
-	int arr[5];
-	size_t len;
-};
-
-#define FORMAT_OBJ_STRUCT format_object__
-FORMAT_OBJ(struct Foo,
-           format_foo,
-           ((format_fmt_int, val), "x"),
-           (val, "b"),
-           (FORMAT_ARRAY(arr), "[{1}]:{}", (FORMAT_OBJ_STRUCT->len)))
 
 #endif // LIBFORMAT_H

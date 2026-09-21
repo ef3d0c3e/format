@@ -1,9 +1,26 @@
+/* format -- C formatting library
+ * Copyright (C) 2026 ef3d0c3e
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ * and associated documentation files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #include "fmt.h"
 #include <ctype.h>
 #include <string.h>
 
-static inline int
-next(const char* fmt, size_t i, size_t* start, size_t* end)
+static inline int format_warn_unused_result format_nonnull(1, 3, 4)
+  next(const char* fmt, size_t i, size_t* start, size_t* end)
 {
 	int balance = 0;
 
@@ -35,22 +52,24 @@ next(const char* fmt, size_t i, size_t* start, size_t* end)
 	return 0;
 }
 
-static inline void
-write_escaped(struct format_output* output, const char* buf, size_t len)
+static inline int format_warn_unused_result format_nonnull(1, 2)
+  write_escaped(struct format_output* output, const char* buf, size_t len)
 {
-	// TODO: Error
 	for (size_t i = 0; i < len;) {
 		assert(buf[i] != 0);
 		/* Emit one */
 		if (buf[i] == '{' || buf[i] == '}') {
 			assert(buf[i] == buf[i + 1]);
-			format_output_write(output, buf + i, 1);
+			if (format_output_write(output, buf + i, 1))
+				return -1;
 			i += 2;
 		} else {
-			format_output_write(output, buf + i, 1);
+			if (format_output_write(output, buf + i, 1))
+				return -1;
 			++i;
 		}
 	}
+	return 0;
 }
 
 /**
@@ -63,11 +82,11 @@ write_escaped(struct format_output* output, const char* buf, size_t len)
  *
  * @return `0` on success, `-1` on errors
  */
-static inline int
-write_style(struct format_output* output,
-                    format_color fg,
-                    format_color bg,
-                    enum format_output_style style)
+static inline int format_warn_unused_result format_nonnull(1)
+  write_style(struct format_output* output,
+              format_color fg,
+              format_color bg,
+              enum format_output_style style)
 {
 	if (style == kFormatStyleReset) {
 		return format_output_write(output, "\033[0m", 4);
@@ -172,8 +191,8 @@ write_style(struct format_output* output,
  *
  * @return Parser color in @p fmt at @p i
  */
-static inline format_color
-parse_color(const char* fmt, size_t* i)
+static inline format_color format_warn_unused_result format_nonnull(1)
+  parse_color(const char* fmt, size_t* i)
 {
 	format_color color = 0;
 	while (strchr("0123456789abcdef", tolower(fmt[*i]))) {
@@ -186,8 +205,8 @@ parse_color(const char* fmt, size_t* i)
 	return color;
 }
 
-static inline void
-fmt_style(struct format_output* output, const char* fmt, size_t* i)
+static inline int format_warn_unused_result format_nonnull(1, 2, 3)
+  fmt_style(struct format_output* output, const char* fmt, size_t* i)
 {
 	format_color fg = (format_color)~0U;
 	format_color bg = (format_color)~0U;
@@ -236,14 +255,14 @@ fmt_style(struct format_output* output, const char* fmt, size_t* i)
 				++*i;
 		} else {
 			assert(0 && "Invalid style");
-			__builtin_unreachable();
+			format_unreachable();
 		}
 	}
 
-	write_style(output, fg, bg, style);
+	return write_style(output, fg, bg, style);
 }
 
-void
+int
 format_args(struct format_output* output, const char* fmt, const struct format_env env)
 {
 	// TODO: Err handling
@@ -252,14 +271,17 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 		size_t start, end;
 		if (!next(fmt, i, &start, &end)) {
 			/* Nothing left */
-			write_escaped(output, fmt + i, strlen(fmt + i));
+			if (write_escaped(output, fmt + i, strlen(fmt + i)))
+				return -1;
 			break;
 		}
-		write_escaped(output, fmt + i, start - i);
+		if (write_escaped(output, fmt + i, start - i))
+			return -1;
 		assert(start <= end);
 		i = start + 1;
 		if (fmt[i] == '{') {
-			format_output_write(output, "{", 1);
+			if (format_output_write(output, "{", 1))
+				return -1;
 			++i;
 			continue;
 		}
@@ -267,7 +289,8 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 
 		/* Custom style */
 		if (fmt[i] == 'f' || fmt[i] == 'b' || fmt[i] == '/') {
-			fmt_style(output, fmt, &i);
+			if (fmt_style(output, fmt, &i))
+				return -1;
 			assert(fmt[i] == '}');
 			++i;
 			continue;
@@ -293,15 +316,13 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 			sep = fmt + end;
 
 		/* Call formatter */
-		if (env.args[index].type == kFormatScalar)
-		{
+		if (env.args[index].type == kFormatScalar) {
 			assert(env.args[index].formatter != NULL);
 			env.args[index].formatter(output, sep, &env, index);
-		}
-		else if (env.args[index].type == kFormatCollection)
-		{
+		} else if (env.args[index].type == kFormatCollection) {
 			format_fmt_collection(output, sep, &env, index);
 		}
 		i = end + 1;
 	}
+	return 0;
 }
