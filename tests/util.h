@@ -5,7 +5,6 @@
 #include <criterion/logging.h>
 
 #include <format.h>
-#include <../src/buffer.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -146,27 +145,27 @@ do { \
 	FORMAT__DIAG(clang, ignored "-Wformat") \
 	const size_t len = strlen(expected_); \
 	{ \
-		struct format_output out = format_output_buf(); \
-		format(&out, fmt_format_, __VA_ARGS__); \
-		if (out.size != len || memcmp(out.data, expected_, out.size) != 0) \
+		struct format_output out__ = format_output_buf(); \
+		format(&out__, fmt_format_, __VA_ARGS__); \
+		if (out__.size != len || memcmp(out__.data, expected_, out__.size) != 0) \
 		{ \
 			printf("Got:\n"); \
-			print_buffer(out.data, out.size); \
+			print_buffer(out__.data, out__.size); \
 			printf("Expected:\n"); \
 			print_buffer(expected_, len); \
 			cr_assert(0, "test %s", #fmt_format_); \
 		} \
 		else \
 			cr_assert(1); \
-		format_output_destroy(&out); \
+		format_output_destroy(&out__); \
 	} \
 	{ \
 		char *data_buf = NULL; \
 		size_t data_size = 0; \
 		FILE *f = open_memstream(&data_buf, &data_size); \
-		struct format_output out = format_output_file(f); \
-		format(&out, fmt_format_, __VA_ARGS__); \
-		format_output_destroy(&out); \
+		struct format_output out__ = format_output_file(f); \
+		format(&out__, fmt_format_, __VA_ARGS__); \
+		format_output_destroy(&out__); \
 		fclose(f); \
 		if (data_size != (size_t)len || memcmp(data_buf, expected_, data_size) != 0) \
 		{ \
@@ -186,9 +185,9 @@ do { \
 		int fd = shm_open(name, O_CLOEXEC | O_CREAT | O_EXCL | O_RDWR, 0600); \
 		cr_assert(fd != -1, "Failed to open memory fd"); \
 		shm_unlink(name); \
-		struct format_output out = format_output_fd(fd); \
-		format(&out, fmt_format_, __VA_ARGS__); \
-		format_output_destroy(&out); \
+		struct format_output out__ = format_output_fd(fd); \
+		format(&out__, fmt_format_, __VA_ARGS__); \
+		format_output_destroy(&out__); \
 		off_t size = lseek(fd, 0, SEEK_END); \
 		lseek(fd, 0, SEEK_SET); \
 		char *data = malloc((size_t)size); \

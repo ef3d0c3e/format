@@ -1,28 +1,66 @@
 #include "util.h"
 
-Test(fmt_collection, temp)
+Test(fmt_collection, basic)
 {
-	struct format_output out = format_output_file(stdout);
-	struct Foo foo = {
-		.val = 0x64,
-		.str = "Hello,\n World!",
-		.x = 123456,
-		.arr = {1,2,3,4,5},
-		.len = 4,
-	};
-	format(&out, "{}", (format_foo, &foo));
+	const int int_arr[16] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, };
+	const long long_arr[16] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, };
+	const char* str_arr[16] = { "lorem", "ipsum", "dolor", "sit", "amet", "foo", "bar", "baz", "quz", "quz", "", "-", "{}", ".", "hello", "world" };
+	for (size_t i = 0; i < 16; ++i)
+	{
+		char out[8192];
+#define manual(start, end, fmt, fmt_sep, array) \
+		do { \
+			size_t pos = 0; \
+			pos += (size_t)sprintf(out + pos, start); \
+			for (size_t j = 0; j < i; ++j) \
+			{ \
+				if (j != 0) \
+					pos += (size_t)sprintf(out + pos, fmt_sep, array[j]); \
+				else \
+					pos += (size_t)sprintf(out + pos, fmt, array[j]); \
+			} \
+			sprintf(out + pos, end); \
+		} while (0)
 
-	//int arr[16] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17 };
+		manual("{", "}", "%d", ", %d", int_arr);
+		test_manual("{:[{1}]:{}}", out, FORMAT_ARRAY(int_arr), i);
+		manual("{", "}", "%x", ", %x", int_arr);
+		test_manual("{:[{1}]:{x}}", out, FORMAT_ARRAY(int_arr), i);
 
-	//const char * stra[] = {
-	//	"lorem",
-	//	"ipsum",
-	//	"dolor",
-	//	"sit",
-	//	"amet",
-	//};
-	//char *str = "Hello, World!";
-	//format(&out, "{:[{1}]#({2}):{x}}\n", FORMAT_ARRAY(str), strlen(str), "");
-	//struct stat sb;
-	//format(&out, "{1:{0}}\n", 5, 6);
+		manual("{", "}", "%ld", ", %ld", long_arr);
+		test_manual("{:[{1}]:{}}", out, FORMAT_ARRAY(long_arr), i);
+		manual("{", "}", "%lx", ", %lx", long_arr);
+		test_manual("{:[{1}]:{x}}", out, FORMAT_ARRAY(long_arr), i);
+
+		manual("{", "}", "%s", ", %s", str_arr);
+		test_manual("{:[{1}]:{}}", out, FORMAT_ARRAY(str_arr, format_fmt_str), i);
+
+		manual("[", "]", "%d", " %d", int_arr);
+		test_manual("{:[{1}]#[ ]:{}}", out, FORMAT_ARRAY(int_arr), i);
+		manual("[", "]", "%x", " %x", int_arr);
+		test_manual("{:[{1}]#[ ]:{x}}", out, FORMAT_ARRAY(int_arr), i);
+
+		manual("[", "]", "%ld", " %ld", long_arr);
+		test_manual("{:[{1}]#[ ]:{}}", out, FORMAT_ARRAY(long_arr), i);
+		manual("[", "]", "%lx", " %lx", long_arr);
+		test_manual("{:[{1}]#[ ]:{x}}", out, FORMAT_ARRAY(long_arr), i);
+
+		manual("[", "]", "%s", " %s", str_arr);
+		test_manual("{:[{1}]#[ ]:{}}", out, FORMAT_ARRAY(str_arr, format_fmt_str), i);
+
+		manual("{<", ">}", "%d", "| |%d", int_arr);
+		test_manual("{:[{1}]#{2}{3}{4}:{}}", out, FORMAT_ARRAY(int_arr), i, "{<", "| |", ">}");
+		manual("{<", ">}", "%x", "| |%x", int_arr);
+		test_manual("{:[{1}]#{2}{3}{4}:{x}}", out, FORMAT_ARRAY(int_arr), i, "{<", "| |", ">}");
+
+		manual("{<", ">}", "%ld", "| |%ld", long_arr);
+		test_manual("{:[{1}]#{2}{3}{4}:{}}", out, FORMAT_ARRAY(long_arr), i, "{<", "| |", ">}");
+		manual("{<", ">}", "%lx", "| |%lx", long_arr);
+		test_manual("{:[{1}]#{2}{3}{4}:{x}}", out, FORMAT_ARRAY(long_arr), i, "{<", "| |", ">}");
+
+		manual("{<", ">}", "%s", "| |%s", str_arr);
+		test_manual("{:[{1}]#{2}{3}{4}:{}}", out, FORMAT_ARRAY(str_arr, format_fmt_str), i, "{<", "| |", ">}");
+#undef manual
+	}
 }
+

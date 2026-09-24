@@ -518,14 +518,14 @@ Test(fmt_unsigned_long, bad_spec_ref_missing_digit, .signal = SIGABRT) {
 Test(fmt_unsigned_long, bad_spec_ref_out_of_range, .signal = SIGABRT) {
 	struct format_output out = format_output_buf();
 	/* Only one argument supplied; {1} inside the width reference
-	 * points past it. */
+	 * points past it */
 	format(&out, "{0:{1}}", 1UL);
 }
 
 Test(fmt_unsigned_long, bad_spec_ref_missing_brace, .signal = SIGABRT) {
 	struct format_output out = format_output_buf();
 	/* Two args, so the out-of-range check passes and this isolates
-	 * the "Expected `}' after number" check instead. */
+	 * the "Expected `}' after number" check instead */
 	format(&out, "{0:{1x}}", 1UL, 2UL);
 }
 
