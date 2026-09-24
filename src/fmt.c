@@ -18,7 +18,7 @@
 #include "fmt.h"
 
 size_t
-utf8_len(const char* str, size_t len)
+format_utf8_len(const char* str, size_t len)
 {
 	if (!len)
 		return 0;
@@ -49,7 +49,7 @@ utf8_len_str(const char* str, size_t len)
 {
 	size_t u8len = 0;
 	for (size_t i = 0; i < len;) {
-		const size_t cp = utf8_len(str + i, len - i);
+		const size_t cp = format_utf8_len(str + i, len - i);
 		i += cp;
 		++u8len;
 	}
@@ -57,7 +57,7 @@ utf8_len_str(const char* str, size_t len)
 }
 
 size_t
-parse_size(const char* fmt_spec, size_t* i, const struct format_env* env)
+format_parse_size(const char* fmt_spec, size_t* i, const struct format_env* env)
 {
 	size_t size = 0;
 	/* Reference */
@@ -88,7 +88,7 @@ parse_size(const char* fmt_spec, size_t* i, const struct format_env* env)
 }
 
 size_t
-parse_number(const char* fmt_spec, size_t* i, const struct format_env* env)
+format_parse_number(const char* fmt_spec, size_t* i, const struct format_env* env)
 {
 	size_t number = 0;
 	/* Reference */
@@ -115,10 +115,10 @@ parse_number(const char* fmt_spec, size_t* i, const struct format_env* env)
 	return number;
 }
 
-struct spec_placeholder
-parse_placeholder(const char* fmt_spec, size_t* i, const struct format_env* env)
+struct format_spec_placeholder
+format_parse_placeholder(const char* fmt_spec, size_t* i, const struct format_env* env)
 {
-	struct spec_placeholder placeholder;
+	struct format_spec_placeholder placeholder;
 	/* Parse from arg list */
 	if (fmt_spec[*i] == '{') {
 		placeholder.type = 1;
@@ -141,7 +141,7 @@ parse_placeholder(const char* fmt_spec, size_t* i, const struct format_env* env)
 
 	/* Literal, single codepoint only */
 	assert(fmt_spec[*i] != '}' && "Expected placeholder");
-	const size_t len = utf8_len(fmt_spec + *i, 5);
+	const size_t len = format_utf8_len(fmt_spec + *i, 5);
 	assert(len <= 5);
 
 	placeholder.type = 0;
@@ -155,8 +155,8 @@ parse_placeholder(const char* fmt_spec, size_t* i, const struct format_env* env)
 }
 
 int
-write_placeholder(struct format_output* output,
-                  const struct spec_placeholder* placeholder,
+format_write_placeholder(struct format_output* output,
+                  const struct format_spec_placeholder* placeholder,
                   size_t max_width,
                   int reverse)
 {
@@ -188,7 +188,7 @@ write_placeholder(struct format_output* output,
 			size_t skip = placeholder->width - remainder;
 			size_t off = 0, cps = 0;
 			while (cps < skip && off < placeholder->len) {
-				const size_t cp = utf8_len(placeholder->str + off, placeholder->len - off);
+				const size_t cp = format_utf8_len(placeholder->str + off, placeholder->len - off);
 				off += cp ? cp : 1;
 				++cps;
 			}
@@ -207,7 +207,7 @@ write_placeholder(struct format_output* output,
 	if (remainder > 0) {
 		size_t off = 0, cps = 0;
 		while (cps < remainder && off < placeholder->len) {
-			const size_t cp = utf8_len(placeholder->str + off, placeholder->len - off);
+			const size_t cp = format_utf8_len(placeholder->str + off, placeholder->len - off);
 			off += cp ? cp : 1;
 			++cps;
 		}
@@ -218,11 +218,11 @@ write_placeholder(struct format_output* output,
 }
 
 void
-parse_alignment(const char* fmt_spec,
+format_parse_alignment(const char* fmt_spec,
                 size_t* i,
                 const struct format_env* env,
                 char* alignment,
-                struct spec_placeholder* fill,
+                struct format_spec_placeholder* fill,
                 const char* default_placeholder)
 {
 	do {
@@ -246,13 +246,13 @@ parse_alignment(const char* fmt_spec,
 		}
 		/* <codepoint><align> */
 		else {
-			const size_t len = utf8_len(fmt_spec + *i, 5);
+			const size_t len = format_utf8_len(fmt_spec + *i, 5);
 			if ((len == 1 && fmt_spec[*i] == '#') || !strchr("<>^", fmt_spec[*i + len]))
 				break;
 		}
 
 		/* Parse placeholder + alignment */
-		*fill = parse_placeholder(fmt_spec, i, env);
+		*fill = format_parse_placeholder(fmt_spec, i, env);
 		assert(strchr("<>^", fmt_spec[*i]));
 		*alignment = fmt_spec[*i];
 		++*i;

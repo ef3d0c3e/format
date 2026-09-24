@@ -351,6 +351,165 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 /** @} */
 
 /**
+ * @defgroup FormatUtil Formatting utils
+ * @{
+ */
+
+/**
+ * @class format_spec_placeholder
+ * @brief Represent a placeholder string
+ *
+ * A placeholder is either a single literal UTF-8 codepoint, or a string
+ */
+struct format_spec_placeholder
+{
+	/**
+	 * @brief Placeholder type
+	 *  - `0`: Codepoint
+	 *  - `1`: String
+	 */
+	int type;
+	union
+	{
+		char codepoint[5];
+		const char* str;
+	};
+	/** @brief Number of bytes in the string (strlen) */
+	size_t len;
+	/** @brief Number of codepoints in the string */
+	size_t width;
+};
+
+/**
+ * @brief Write a @ref spec_placeholder to the output
+ *
+ * @param output Output to write to
+ * @param placeholder Placeholder to write
+ * @param max_width Maximum width to fill with the placeholder, value `(size_t)-1` writes the
+ * placeholder a single time, disregarding width
+ * @param reverse Write the placeholder in reverse (only applies to string placeholders)
+ *
+ * @return 0 on success, -1 on errors
+ */
+int
+format_write_placeholder(struct format_output* output,
+                         const struct format_spec_placeholder* placeholder,
+                         size_t max_width,
+                         int reverse) format_nonnull(1, 2);
+
+/**
+ * @brief Compute the length of a unicode codepoint
+ *
+ * @param str Codepoint start byte
+ * @param len Maximum length to search @p str for
+ *
+ * @return The length of the UTF-8 codepoint starting at `*str`
+ * @return `0` if len is 0 or the sequence `str[0]..str[len]` does not start with a valid
+ * codepoint
+ */
+size_t
+format_utf8_len(const char* str, size_t len) format_nonnull(1);
+
+/**
+ * @brief Parse a numeric value associated to a size from a format specifier
+ *
+ * A numeric value is either an integer literal: `0`, `5`, `123456`, ...
+ * Or a reference to an integer argument in @ref format_env: `{1}`, `{0}`, ...
+ *
+ * This function may not parse a size greater than 16384 for safety reasons.
+ * It will assert to make sure this doesn't happen.
+ *
+ * @param fmt_spec Format specifier
+ * @param i Index to start parsing at (will advance)
+ * @param env Formatting environment
+ *
+ * @return The parsed numeric value
+ */
+size_t
+format_parse_size(const char* fmt_spec, size_t* i, const struct format_env* env)
+  format_nonnull(1, 2, 3);
+
+/**
+ * @brief Parse a numeric value from a format specifier
+ *
+ * A numeric value is either an integer literal: `0`, `5`, `123456`, ...
+ * Or a reference to an integer argument in @ref format_env: `{1}`, `{0}`, ...
+ *
+ * This function works like `format_parse_size`, except it has no size constraints on the parsed
+ * number.
+ *
+ * @param fmt_spec Format specifier
+ * @param i Index to start parsing at (will advance)
+ * @param env Formatting environment
+ *
+ * @return The parsed numeric value
+ */
+size_t
+format_parse_number(const char* fmt_spec, size_t* i, const struct format_env* env)
+  format_nonnull(1, 2, 3);
+
+/**
+ * @brief Parse a @ref spec_placeholder from a format specifier
+ *
+ * A placeholder is either a single codepoint literal: `a`, `5`, `か`, ...
+ * Or a reference to string argument in @ref format_env: `{1}`, `{0}`, ...
+ *
+ * Note that this function expects the placeholder to be valid UTF-8
+ *
+ * @param fmt_spec Format specifier
+ * @param i Index to start parsing at (will advance)
+ * @param env Formatting environment
+ *
+ * @return The parsed placeholder
+ */
+struct format_spec_placeholder
+format_parse_placeholder(const char* fmt_spec, size_t* i, const struct format_env* env)
+  format_nonnull(1, 2, 3);
+
+/**
+ * @brief Parse alignment
+ *
+ * Parse an OPTIONAL alignment specifier:
+ * ```
+ * alignment := placeholder? ('<' | '>' | '^') size
+ * ```
+ *
+ * If no alignment specifier is found, then this function succeeds sets a default alignment:
+ *  - Left aligned
+ *  - 0 width
+ *  - Default placeholder
+ *
+ * @param fmt_spec Format specifier
+ * @param i Index to start parsing at (will advance)
+ * @param env Formatting environment
+ * @param alignment (out) Alignment character: '<', '>' or '^'
+ * @param fill (out) Fill character placeholder
+ * @param default_placeholder Default placeholder to use if none is specified
+ */
+void
+format_parse_alignment(const char* fmt_spec,
+                       size_t* i,
+                       const struct format_env* env,
+                       char* alignment,
+                       struct format_spec_placeholder* fill,
+                       const char* default_placeholder) format_nonnull(1, 2, 3, 4, 5);
+
+/**
+ * @brief Format arguments
+ *
+ * @param output Output buffer
+ * @param fmt Format string
+ * @param env Format arguments
+ *
+ * @return 0 on success, -1 on failure
+ */
+int format_warn_unused_result
+format_args(struct format_output* output, const char* fmt, const struct format_env env)
+  format_nonnull(1, 2);
+
+/** @} */
+
+/**
  * @defgroup Formatters Default formatters
  * @{
  */
@@ -506,6 +665,11 @@ format_fmt_unsigned_char(struct format_output* output,
                          const struct format_env* env,
                          size_t idx) format_nonnull(1, 2, 3);
 
+int
+format_fmt_float(struct format_output*, const char*, const struct format_env*, size_t);
+int
+format_fmt_double(struct format_output*, const char*, const struct format_env*, size_t);
+
 /**
  * @brief Format a `char` argument
  *
@@ -537,25 +701,23 @@ format_fmt_str(struct format_output* output,
                const struct format_env* env,
                size_t idx) format_nonnull(1, 2, 3);
 
-int
-format_fmt_float(struct format_output*, const char*, const struct format_env*, size_t);
-int
-format_fmt_double(struct format_output*, const char*, const struct format_env*, size_t);
-
-/** @} */
-
 /**
- * @brief Format arguments
+ * @brief Format a collection
  *
- * @param output Output buffer
- * @param fmt Format string
- * @param env Format arguments
+ * @param output Output to write to
+ * @param fmt_spec Format specifier for this argument
+ * @param env Format environment
+ * @param idx Index of this argument in @p env
  *
- * @return 0 on success, -1 on failure
+ * @return 0 on success, -1 on errors
  */
 int format_warn_unused_result
-format_args(struct format_output* output, const char* fmt, const struct format_env env)
-  format_nonnull(1, 2);
+format_fmt_collection(struct format_output* output,
+                      const char* fmt_spec,
+                      const struct format_env* env,
+                      size_t idx) format_nonnull(1, 2, 3);
+
+/** @} */
 
 /**
  * @defgroup Macros Helper macros
@@ -833,6 +995,12 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 	assert(format_arg__.collection.width != NULL);                                               \
 	assert(format_arg__.collection.formatter != NULL);                                           \
 	format_arg__.data = (uintptr_t)(FIELD);
+#define FORMAT__FORMATTER_TRIPLET_SUBOBJECT(FORMATTER, FIELD)                                    \
+	typeof(FIELD)* format_arg_triplet__ = (&FIELD);                                              \
+	(void)format_arg_triplet__;                                                                  \
+	format_arg__.type = kFormatScalar;                                                           \
+	format_arg__.formatter = (FORMATTER);                                                        \
+	format_arg__.data = (uintptr_t)(&FIELD);
 #define FORMAT__FORMATTER_TRIPLET(TAG, X, Y) FORMAT__CAT(FORMAT__FORMATTER_TRIPLET_, TAG)(X, Y)
 
 #define FORMAT__MAPPER_VALUE(ARG)                                                                \
@@ -854,18 +1022,17 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		  FORMAT__IS_TRIPLET(ARG))()(/* respect strict-aliasing */                               \
 		                             assert(format_arg__.formatter != NULL &&                    \
 		                                    "Could not find formatter for argument"));           \
-		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))()((void)__builtin_choose_expr(                  \
-		  FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)),                                   \
-		  __extension__({                                                                        \
-			  format_arg__.data = (uintptr_t)FORMAT__MAPPER_VALUE(ARG);                          \
-			  0;                                                                                 \
-		  }),                                                                                    \
-		  __extension__({                                                                        \
-			  const typeof(FORMAT__MAPPER_VALUE(ARG)) format_temp__ = FORMAT__MAPPER_VALUE(ARG); \
-			  format_arg__.data = 0;                                                             \
-			  memcpy(&format_arg__.data, &format_temp__, sizeof(format_temp__));                 \
-			  0;                                                                                 \
-		  })));                                                                                  \
+		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))()(                                              \
+		  format_arg__.data = __builtin_choose_expr(                                             \
+		    FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)),                                 \
+		    __extension__({ (uintptr_t)(FORMAT__MAPPER_VALUE(ARG)); }),                          \
+		    __extension__({                                                                      \
+			    const typeof(FORMAT__MAPPER_VALUE(ARG)) format_temp__ =                          \
+			      FORMAT__MAPPER_VALUE(ARG);                                                     \
+			    typeof(format_arg__.data) format_result__;                                       \
+			    memcpy(&format_result__, &format_temp__, sizeof(format_temp__));                 \
+			    format_result__;                                                                 \
+		    })));                                                                                \
 		format_arg__;                                                                            \
 	}),
 
@@ -881,7 +1048,7 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
  * @return The result of @ref format_args: 0 on success, -1 on errors
  */
 #define format(output, fmt, ...)                                                                 \
-	__extension__ ({                                                                                           \
+	__extension__({                                                                              \
 		FORMAT__START_DIAG(clang)                                                                \
 		FORMAT__DIAG(clang, ignored "-Wc2y-extensions")                                          \
 		_Static_assert(__builtin_types_compatible_p(typeof(output), struct format_output*),      \
@@ -891,13 +1058,13 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		               "Invalid format string");                                                 \
 		struct format_arg format_args__[] = { FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(    \
 		  FORMAT__EXPAND(FORMAT__EVAL(FORMAT__MAP(FORMAT__MAPPER, __VA_ARGS__))))() };           \
-		int result_ = format_args(                                                               \
+		int format_result__ = format_args(                                                       \
 		  output,                                                                                \
 		  fmt,                                                                                   \
 		  (const struct format_env){                                                             \
 		    .args = format_args__, .size = sizeof(format_args__) / sizeof(format_args__[0]) });  \
 		FORMAT__END_DIAG(clang)                                                                  \
-		result_;                                                                                 \
+		format_result__;                                                                         \
 	})
 
 /**
@@ -988,11 +1155,23 @@ format__collection_array_width(struct format_arg_collection* collection,
 
 /** @} */
 
+/**
+ * @defgroup FormatObject Object formatting
+ *
+ * This is still a work in progress API, expect changes
+ *
+ * @{
+ */
+#ifndef FORMAT_OBJ_WIDTH
+#define FORMAT_OBJ_WIDTH (4)
+#endif // FORMAT_OBJ_WIDTH
+
+/* Single: field */
 #define FORMAT__OBJ_MAPPER_S(N, CONST, ARG)                                                      \
 	format(output,                                                                               \
 	       "{:>{1}}{2} = ",                                                                      \
 	       "",                                                                                   \
-	       4 * FORMAT__SELECT(0, CONST),                                                         \
+	       FORMAT_OBJ_WIDTH* FORMAT__SELECT(0, CONST),                                           \
 	       FORMAT__STRINGIFY(FORMAT__SELECT(0, ARG)));                                           \
 	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
 	(format(output,                                                                              \
@@ -1003,8 +1182,13 @@ format__collection_array_width(struct format_arg_collection* collection,
 	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
 	         FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG)));
 
+/* Pair: (formatter, field) */
 #define FORMAT__OBJ_MAPPER_P(N, CONST, ARG, FORMATTER, FIELD)                                    \
-	format(output, "{:>{1}}{2} = ", "", 4 * FORMAT__SELECT(0, CONST), FORMAT__STRINGIFY(FIELD)); \
+	format(output,                                                                               \
+	       "{:>{1}}{2} = ",                                                                      \
+	       "",                                                                                   \
+	       FORMAT_OBJ_WIDTH* FORMAT__SELECT(0, CONST),                                           \
+	       FORMAT__STRINGIFY(FIELD));                                                            \
 	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
 	(format(output,                                                                              \
 	        "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                 \
@@ -1013,10 +1197,13 @@ format__collection_array_width(struct format_arg_collection* collection,
 	  format(                                                                                    \
 	    output, "{0:" FORMAT__SELECT(1, ARG) "},\n", (FORMATTER, FORMAT_OBJ_STRUCT->FIELD)));
 
+/* Triplet: (tag, data, field) */
 #define FORMAT__OBJ_MAPPER_T(N, CONST, ARG, TAG, DATA, FIELD)                                    \
-	typeof(*FORMAT_OBJ_STRUCT->FIELD)* format_arg_triplet__ = FORMAT_OBJ_STRUCT->FIELD;          \
-	(void)format_arg_triplet__;                                                                  \
-	format(output, "{:>{1}}{2} = ", "", 4 * FORMAT__SELECT(0, CONST), FORMAT__STRINGIFY(FIELD)); \
+	format(output,                                                                               \
+	       "{:>{1}}{2} = ",                                                                      \
+	       "",                                                                                   \
+	       FORMAT_OBJ_WIDTH* FORMAT__SELECT(0, CONST),                                           \
+	       FORMAT__STRINGIFY(FIELD));                                                            \
 	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, FORMAT__EXPAND ARG))(                                     \
 	  format(output,                                                                             \
 	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
@@ -1025,6 +1212,7 @@ format__collection_array_width(struct format_arg_collection* collection,
 	                                         "{0:" FORMAT__SELECT(1, ARG) "},\n",                \
 	                                         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD)));
 
+/* Send to single, pair, triplet object arg formatter */
 #define FORMAT__OBJ_MAPPER(N, CONST, ARG)                                                        \
 	FORMAT__IF_ELSE(FORMAT__IS_PAIR(FORMAT__SELECT(0, ARG)))(                                    \
 	  FORMAT__OBJ_MAPPER_P(N, CONST, ARG, FORMAT__SELECT(0, 0, ARG), FORMAT__SELECT(0, 1, ARG)   \
@@ -1050,16 +1238,21 @@ format__collection_array_width(struct format_arg_collection* collection,
 		FORMAT__SELECT(0, 1, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, (ARG)))) }
 
 #define FORMAT_OBJ(TYPE, FUN, ...)                                                               \
-	int FUN(struct format_output* output,                                                        \
-	        const char* fmt_spec,                                                                \
-	        const struct format_env* env,                                                        \
-	        size_t idx)                                                                          \
+	int format_warn_unused_result format_nonnull(1, 2, 3) FUN(struct format_output* output,      \
+	                                                          const char* fmt_spec,              \
+	                                                          const struct format_env* env,      \
+	                                                          size_t idx)                        \
 	{                                                                                            \
+		size_t format_depth__ = 1;                                                               \
+		size_t i = 0;                                                                            \
+		if (*fmt_spec != '}')                                                                    \
+			format_depth__ = format_parse_number(fmt_spec, &i, env);                             \
+		assert(format_depth__ > 0 && "Format depth for objects cannot be 0");                    \
+		assert(fmt_spec[i] == '}');                                                              \
 		const TYPE* FORMAT_OBJ_STRUCT = (const TYPE*)env->args[idx].data;                        \
 		assert(FORMAT_OBJ_STRUCT != NULL && "Cannot format a NULL object");                      \
-		size_t format_depth__ = 1;                                                               \
                                                                                                  \
-		format(output, "{0:>{1}}{2} {{\n", "", 4 * (format_depth__ - 1), #TYPE);                 \
+		format(output, "{} {{\n", #TYPE);  \
 		enum                                                                                     \
 		{                                                                                        \
 			counter_base = __COUNTER__                                                           \
@@ -1067,25 +1260,13 @@ format__collection_array_width(struct format_arg_collection* collection,
 		FORMAT__EXPAND(FORMAT__EVAL_O(                                                           \
 		  FORMAT__MAP_CONST_N(counter_base, FORMAT__OBJ_MAPPER, (format_depth__), __VA_ARGS__))) \
                                                                                                  \
-		format(output, "{0:>{1}}}}", "", 4 * (format_depth__ - 1));                              \
+		format(output, "{0:>{1}}}}", "", FORMAT_OBJ_WIDTH * (format_depth__ - 1));               \
 		return 0;                                                                                \
 	}
-
-struct Foo
-{
-	int val;
-	const char* str;
-	long x;
-	int arr[5];
-	size_t len;
-};
-
 #define FORMAT_OBJ_STRUCT format_object__
-FORMAT_OBJ(struct Foo,
-           format_foo,
-           ((format_fmt_int, val), "x"),
-           (val, "b"),
-           (FORMAT_ARRAY(arr), "[{1}]:{}", (FORMAT_OBJ_STRUCT->len)))
+#define FORMAT_SUBOBJ(FORMATTER, FIELD) (SUBOBJECT, FORMATTER, FIELD)
+
+/** @} */
 
 /**
  * @defgroup Grammar Format expression grammar

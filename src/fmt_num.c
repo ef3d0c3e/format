@@ -21,7 +21,7 @@
 struct number_spec
 {
 	/** @brief Fill string */
-	struct spec_placeholder fill;
+	struct format_spec_placeholder fill;
 	/**
 	 * @brief Alignment character:
 	 *  - `<`: Left (default)
@@ -76,7 +76,7 @@ parse_number_spec(const char* fmt_spec, const struct format_env* env)
 
 	size_t i = 0;
 	/* Parse align */
-	parse_alignment(fmt_spec, &i, env, &spec.align, &spec.fill, " ");
+	format_parse_alignment(fmt_spec, &i, env, &spec.align, &spec.fill, " ");
 
 	/* Parse sign */
 	if (strchr("-+ ", fmt_spec[i]))
@@ -98,12 +98,12 @@ parse_number_spec(const char* fmt_spec, const struct format_env* env)
 		spec.align = '<'; /* Left-aligned by default */
 
 	/* Parse width */
-	spec.width = parse_size(fmt_spec, &i, env);
+	spec.width = format_parse_size(fmt_spec, &i, env);
 
 	/* Parse precision */
 	if (fmt_spec[i] == '.') {
 		++i;
-		spec.precision = parse_size(fmt_spec, &i, env);
+		spec.precision = format_parse_size(fmt_spec, &i, env);
 	}
 	assert((spec.precision == (size_t)-1 || spec.align != '0') &&
 	       "Cannot use precision with 0-padding");
@@ -165,7 +165,7 @@ write_aligned(struct format_output* output,
 			format_unreachable();
 	}
 
-	if (write_placeholder(output, &spec->fill, left, 0))
+	if (format_write_placeholder(output, &spec->fill, left, 0))
 		return -1;
 
 	if (spec->align == '0') {
@@ -190,7 +190,7 @@ write_aligned(struct format_output* output,
 			return -1;
 	}
 
-	if (write_placeholder(output, &spec->fill, right, 1))
+	if (format_write_placeholder(output, &spec->fill, right, 1))
 		return -1;
 	return 0;
 }

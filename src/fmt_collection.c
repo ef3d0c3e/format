@@ -23,7 +23,7 @@ struct collection_spec
 	size_t precision;
 
 	/** @brief Fill string */
-	struct spec_placeholder fill;
+	struct format_spec_placeholder fill;
 	/**
 	 * @brief Alignment character:
 	 *  - `<`: Left (default)
@@ -36,11 +36,11 @@ struct collection_spec
 	size_t width;
 
 	/** @brief Array start placeholder */
-	struct spec_placeholder start;
+	struct format_spec_placeholder start;
 	/** @brief Array separator placeholder */
-	struct spec_placeholder sep;
+	struct format_spec_placeholder sep;
 	/** @brief Array end placeholder */
-	struct spec_placeholder end;
+	struct format_spec_placeholder end;
 
 	const char* subexpr;
 
@@ -60,22 +60,22 @@ parse_collection_spec(const char* fmt_spec, const struct format_env* env)
 	/* Precision */
 	assert(fmt_spec[i] == '[' && "Expected array format specifier");
 	++i;
-	spec.precision = parse_number(fmt_spec, &i, env);
+	spec.precision = format_parse_number(fmt_spec, &i, env);
 	assert(fmt_spec[i] == ']' && "Expected array format specifier");
 	++i;
 
 	/* Align */
-	parse_alignment(fmt_spec, &i, env, &spec.align, &spec.fill, " ");
+	format_parse_alignment(fmt_spec, &i, env, &spec.align, &spec.fill, " ");
 
 	/* Width */
-	spec.width = parse_size(fmt_spec, &i, env);
+	spec.width = format_parse_size(fmt_spec, &i, env);
 
 	/* Display */
 	if (fmt_spec[i] == '#') {
 		++i;
-		spec.start = parse_placeholder(fmt_spec, &i, env);
-		spec.sep = parse_placeholder(fmt_spec, &i, env);
-		spec.end = parse_placeholder(fmt_spec, &i, env);
+		spec.start = format_parse_placeholder(fmt_spec, &i, env);
+		spec.sep = format_parse_placeholder(fmt_spec, &i, env);
+		spec.end = format_parse_placeholder(fmt_spec, &i, env);
 	} else {
 		spec.start.type = 1;
 		spec.start.len = 1;
@@ -162,14 +162,14 @@ format_fmt_collection(struct format_output* output,
 	}
 
 	/* Left spacing */
-	if (write_placeholder(output, &spec.fill, left, 0))
+	if (format_write_placeholder(output, &spec.fill, left, 0))
 		return -1;
 	/* Left delim */
-	if (write_placeholder(output, &spec.start, (size_t)-1, 0))
+	if (format_write_placeholder(output, &spec.start, (size_t)-1, 0))
 		return -1;
 	for (size_t i = 0; i < spec.precision; ++i) {
 		if (i != 0) {
-			if (write_placeholder(output, &spec.sep, (size_t)-1, 0))
+			if (format_write_placeholder(output, &spec.sep, (size_t)-1, 0))
 				return -1;
 		}
 		const void* val = collection->next(collection);
@@ -181,10 +181,10 @@ format_fmt_collection(struct format_output* output,
 		collection->formatter(output, spec.subexpr, &subenv, 0);
 	}
 	/* Right delim */
-	if (write_placeholder(output, &spec.end, (size_t)-1, 0))
+	if (format_write_placeholder(output, &spec.end, (size_t)-1, 0))
 		return -1;
 	/* Right spacing */
-	if (write_placeholder(output, &spec.fill, right, 1))
+	if (format_write_placeholder(output, &spec.fill, right, 1))
 		return -1;
 
 	return 0;

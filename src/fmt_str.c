@@ -25,7 +25,7 @@
 struct string_spec
 {
 	/** @brief Fill string */
-	struct spec_placeholder fill;
+	struct format_spec_placeholder fill;
 	/**
 	 * @brief Alignment character:
 	 *  - `<`: Left (default)
@@ -38,9 +38,9 @@ struct string_spec
 	/** @brief Toggle quoted mode */
 	int quoted;
 	/** @brief Left quote */
-	struct spec_placeholder left_quote;
+	struct format_spec_placeholder left_quote;
 	/** @brief Right quote */
-	struct spec_placeholder right_quote;
+	struct format_spec_placeholder right_quote;
 	/** @brief Field precision */
 	size_t precision;
 	/**
@@ -71,23 +71,23 @@ parse_string_spec(const char* fmt_spec, const struct format_env* env)
 
 	size_t i = 0;
 	/* Parse align */
-	parse_alignment(fmt_spec, &i, env, &spec.align, &spec.fill, " ");
+	format_parse_alignment(fmt_spec, &i, env, &spec.align, &spec.fill, " ");
 
 	/* Parse width */
-	spec.width = parse_size(fmt_spec, &i, env);
+	spec.width = format_parse_size(fmt_spec, &i, env);
 
 	/* Parse quotes */
 	if (fmt_spec[i] == '#') {
 		++i;
 		spec.quoted = 1;
-		spec.left_quote = parse_placeholder(fmt_spec, &i, env);
-		spec.right_quote = parse_placeholder(fmt_spec, &i, env);
+		spec.left_quote = format_parse_placeholder(fmt_spec, &i, env);
+		spec.right_quote = format_parse_placeholder(fmt_spec, &i, env);
 	}
 
 	/* Parse precision */
 	if (fmt_spec[i] == '.') {
 		++i;
-		spec.precision = parse_size(fmt_spec, &i, env);
+		spec.precision = format_parse_size(fmt_spec, &i, env);
 	}
 
 	/* Parse type */
@@ -124,7 +124,7 @@ format_fmt_str(struct format_output* output,
 	if (spec.quoted)
 		width += spec.left_quote.width + spec.right_quote.width;
 	for (size_t i = 0; i < len;) {
-		const size_t cp = utf8_len(val + i, len - i);
+		const size_t cp = format_utf8_len(val + i, len - i);
 		if (cp == 1) {
 			if (isprint(val[i]) || val[i] == '\t')
 				width += 1;
@@ -156,18 +156,18 @@ format_fmt_str(struct format_output* output,
 	}
 
 	/* Left spacing */
-	if (write_placeholder(output, &spec.fill, left, 0))
+	if (format_write_placeholder(output, &spec.fill, left, 0))
 		return -1;
 	/* Left quote */
 	if (spec.quoted) {
-		if (write_placeholder(output, &spec.left_quote, (size_t)-1, 0))
+		if (format_write_placeholder(output, &spec.left_quote, (size_t)-1, 0))
 			return -1;
 	}
 
 	/* Content */
 	char buf[16];
 	for (size_t i = 0; i < len;) {
-		const size_t cp = utf8_len(val + i, len - i);
+		const size_t cp = format_utf8_len(val + i, len - i);
 		if (cp == 0) {
 			/* Write as-is */
 			if (format_output_write(output, val + i, 1))
@@ -237,11 +237,11 @@ format_fmt_str(struct format_output* output,
 
 	/* Right quote */
 	if (spec.quoted) {
-		if (write_placeholder(output, &spec.right_quote, (size_t)-1, 0))
+		if (format_write_placeholder(output, &spec.right_quote, (size_t)-1, 0))
 			return -1;
 	}
 	/* Right spacing */
-	if (write_placeholder(output, &spec.fill, right, 1))
+	if (format_write_placeholder(output, &spec.fill, right, 1))
 		return -1;
 
 	return 0;
