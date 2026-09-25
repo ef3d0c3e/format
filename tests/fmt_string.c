@@ -25,63 +25,6 @@
 	"upidatat non proident, sunt in culpa qui officia deserunt mollit anim id" \
 	" est laborum."
 
-
-Test(fmt_string, format) {
-	/*
-	for_each(char*, str, STRING_LIST)
-	{
-		test_printf("{}", "%s", str);
-		for (int precision = 0; precision < 128; ++precision)
-		{
-			char fmt1[1024];
-			sprintf(fmt1, "{:.%d}", precision);
-			char fmt2[1024];
-			sprintf(fmt2, "%%.%ds", precision);
-
-			test_printf(fmt1, fmt2, str);
-			test_printf("{1:.{0}}", "%.*s", precision, str);
-		}
-
-		for (int width = 0; width < 128; ++width)
-		{
-			char fmt1[1024];
-			sprintf(fmt1, "{:%d}", width);
-			char fmt2[1024];
-			sprintf(fmt2, "%%-%ds", width);
-
-			test_printf(fmt1, fmt2, str);
-			test_printf("{1:{0}}", "%-*s", width, str);
-		}
-
-		for (int precision = 0; precision < 128; ++precision)
-		{
-			for (int width = 0; width < 128; ++width)
-			{
-				{
-					char fmt1[1024];
-					sprintf(fmt1, "{:%d.%d}", width, precision);
-					char fmt2[1024];
-					sprintf(fmt2, "%%-%d.%ds", width, precision);
-
-					//test_printf(fmt1, fmt2, str);
-					test_printf("{2:{0}.{1}}", "%-*.*s", width, precision, str);
-				}
-				//{
-				//	char fmt1[1024];
-				//	sprintf(fmt1, "{:>%d.%d}", width, precision);
-				//	char fmt2[1024];
-				//	sprintf(fmt2, "%%%d.%ds", width, precision);
-
-				//	test_printf(fmt1, fmt2, str);
-				//	test_printf("{2:>{0}.{1}}", "%*.*s", width, precision, str);
-				//}
-			}
-		}
-	}
-	*/
-	test_printf("{2:{0}.{1}}", "%-*.*s", 10, 20, "abc");
-}
-
 Test(fmt_string, quotes) {
 	struct pair {
 		const char *left, *right;

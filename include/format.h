@@ -730,7 +730,7 @@ format_fmt_collection(struct format_output* output,
 #define FORMAT__DEFER1(m) m FORMAT__EMPTY()
 #define FORMAT__DEFER2(m) m FORMAT__EMPTY FORMAT__EMPTY()()
 
-#define FORMAT__EVAL(...) FORMAT__EVAL1024(__VA_ARGS__)
+#define FORMAT__EVAL(...) FORMAT__EVAL64(__VA_ARGS__)
 #define FORMAT__EVAL1024(...) FORMAT__EVAL512(FORMAT__EVAL512(__VA_ARGS__))
 #define FORMAT__EVAL512(...) FORMAT__EVAL256(FORMAT__EVAL256(__VA_ARGS__))
 #define FORMAT__EVAL256(...) FORMAT__EVAL128(FORMAT__EVAL128(__VA_ARGS__))
@@ -743,7 +743,7 @@ format_fmt_collection(struct format_output* output,
 #define FORMAT__EVAL2(...) FORMAT__EVAL1(FORMAT__EVAL1(__VA_ARGS__))
 #define FORMAT__EVAL1(...) __VA_ARGS__
 
-#define FORMAT__EVAL_T(...) FORMAT__EVAL_T1024(__VA_ARGS__)
+#define FORMAT__EVAL_T(...) FORMAT__EVAL_T64(__VA_ARGS__)
 #define FORMAT__EVAL_T1024(...) FORMAT__EVAL_T512(FORMAT__EVAL_T512(__VA_ARGS__))
 #define FORMAT__EVAL_T512(...) FORMAT__EVAL_T256(FORMAT__EVAL_T256(__VA_ARGS__))
 #define FORMAT__EVAL_T256(...) FORMAT__EVAL_T128(FORMAT__EVAL_T128(__VA_ARGS__))
@@ -756,7 +756,7 @@ format_fmt_collection(struct format_output* output,
 #define FORMAT__EVAL_T2(...) FORMAT__EVAL_T1(FORMAT__EVAL_T1(__VA_ARGS__))
 #define FORMAT__EVAL_T1(...) __VA_ARGS__
 
-#define FORMAT__EVAL_O(...) FORMAT__EVAL_O1024(__VA_ARGS__)
+#define FORMAT__EVAL_O(...) FORMAT__EVAL_O64(__VA_ARGS__)
 #define FORMAT__EVAL_O1024(...) FORMAT__EVAL_O512(FORMAT__EVAL_O512(__VA_ARGS__))
 #define FORMAT__EVAL_O512(...) FORMAT__EVAL_O256(FORMAT__EVAL_O256(__VA_ARGS__))
 #define FORMAT__EVAL_O256(...) FORMAT__EVAL_O128(FORMAT__EVAL_O128(__VA_ARGS__))
@@ -966,25 +966,25 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 	                      (void)0);
 #define FORMAT__CHOOSE(ARG)                                                                      \
 	FORMAT__EXPAND(                                                                              \
-	  FORMAT__EVAL_T(FORMAT__MAP_CONST(FORMAT__MAPPER_CHOOSE,                                    \
-	                                   ARG,                                                      \
-	                                   (long long, format_fmt_long_long),                        \
-	                                   (long, format_fmt_long),                                  \
-	                                   (int, format_fmt_int),                                    \
-	                                   (short, format_fmt_short),                                \
-	                                   (signed char, format_fmt_signed_char),                    \
-	                                   (unsigned long long, format_fmt_unsigned_long_long),      \
-	                                   (unsigned long, format_fmt_unsigned_long),                \
-	                                   (unsigned int, format_fmt_unsigned_int),                  \
-	                                   (unsigned short, format_fmt_unsigned_short),              \
-	                                   (unsigned char, format_fmt_unsigned_char),                \
-	                                   (float, format_fmt_float),                                \
-	                                   (double, format_fmt_double),                              \
-	                                   (char, format_fmt_char),                                  \
-	                                   (const char*, format_fmt_str),                            \
-	                                   (const char[], format_fmt_str),                           \
-	                                   (char*, format_fmt_str),                                  \
-	                                   (char[], format_fmt_str))))
+	  FORMAT__EVAL_T32(FORMAT__MAP_CONST(FORMAT__MAPPER_CHOOSE,                                  \
+	                                     ARG,                                                    \
+	                                     (long long, format_fmt_long_long),                      \
+	                                     (long, format_fmt_long),                                \
+	                                     (int, format_fmt_int),                                  \
+	                                     (short, format_fmt_short),                              \
+	                                     (signed char, format_fmt_signed_char),                  \
+	                                     (unsigned long long, format_fmt_unsigned_long_long),    \
+	                                     (unsigned long, format_fmt_unsigned_long),              \
+	                                     (unsigned int, format_fmt_unsigned_int),                \
+	                                     (unsigned short, format_fmt_unsigned_short),            \
+	                                     (unsigned char, format_fmt_unsigned_char),              \
+	                                     (float, format_fmt_float),                              \
+	                                     (double, format_fmt_double),                            \
+	                                     (char, format_fmt_char),                                \
+	                                     (const char*, format_fmt_str),                          \
+	                                     (const char[], format_fmt_str),                         \
+	                                     (char*, format_fmt_str),                                \
+	                                     (char[], format_fmt_str))))
 
 #define FORMAT__FORMATTER_TRIPLET_COLLECTION(DATA, FIELD)                                        \
 	format_arg__.type = kFormatCollection;                                                       \
@@ -1029,7 +1029,8 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		    __extension__({                                                                      \
 			    const typeof(FORMAT__MAPPER_VALUE(ARG)) format_temp__ =                          \
 			      FORMAT__MAPPER_VALUE(ARG);                                                     \
-			    typeof(format_arg__.data) format_result__;                                       \
+			    typeof(format_arg__.data) format_result__ = 0;                                   \
+			    _Static_assert(sizeof(typeof(format_arg__.data)) <= sizeof(uintptr_t));          \
 			    memcpy(&format_result__, &format_temp__, sizeof(format_temp__));                 \
 			    format_result__;                                                                 \
 		    })));                                                                                \
@@ -1113,8 +1114,11 @@ format__collection_array_width(struct format_arg_collection* collection,
 
 		if (collection->is_pointer)
 			arg.data = *(uintptr_t*)val;
-		else
+		else {
+			arg.data = 0;
+			assert(collection->elem_size <= sizeof(uintptr_t));
 			memcpy(&arg.data, val, collection->elem_size);
+		}
 		collection->formatter(&out, fmt, &env, 0);
 		c.cur = (char*)c.cur + collection->elem_size;
 	}
@@ -1168,49 +1172,68 @@ format__collection_array_width(struct format_arg_collection* collection,
 
 /* Single: field */
 #define FORMAT__OBJ_MAPPER_S(N, CONST, ARG)                                                      \
-	format(output,                                                                               \
-	       "{:>{1}}{2} = ",                                                                      \
-	       "",                                                                                   \
-	       FORMAT_OBJ_WIDTH* FORMAT__SELECT(0, CONST),                                           \
-	       FORMAT__STRINGIFY(FORMAT__SELECT(0, ARG)));                                           \
-	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
-	(format(output,                                                                              \
-	        "{0:" FORMAT__SELECT(0, ARG) "},\n",                                                 \
-	        FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG),                                           \
-	        FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                             \
-	  format(output,                                                                             \
-	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
-	         FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG)));
+	{                                                                                            \
+		const int format_result__1 = format(output,                                              \
+		                                    "{:>{1}}{2} = ",                                     \
+		                                    "",                                                  \
+		                                    FORMAT_OBJ_WIDTH * FORMAT__SELECT(0, CONST),         \
+		                                    FORMAT__STRINGIFY(FORMAT__SELECT(0, ARG)));          \
+		if (format_result__1 != 0)                                                               \
+			return format_result__1;                                                             \
+		const int format_result__2 = FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))(                   \
+		  format(output,                                                                         \
+		         "{0:" FORMAT__SELECT(0, ARG) "},\n",                                            \
+		         FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG),                                      \
+		         FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                        \
+		  format(output,                                                                         \
+		         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                            \
+		         FORMAT_OBJ_STRUCT->FORMAT__SELECT(0, ARG)));                                    \
+		if (format_result__2 != 0)                                                               \
+			return format_result__2;                                                             \
+	}
 
 /* Pair: (formatter, field) */
 #define FORMAT__OBJ_MAPPER_P(N, CONST, ARG, FORMATTER, FIELD)                                    \
-	format(output,                                                                               \
-	       "{:>{1}}{2} = ",                                                                      \
-	       "",                                                                                   \
-	       FORMAT_OBJ_WIDTH* FORMAT__SELECT(0, CONST),                                           \
-	       FORMAT__STRINGIFY(FIELD));                                                            \
-	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))                                                     \
-	(format(output,                                                                              \
-	        "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                 \
-	        (FORMATTER, FORMAT_OBJ_STRUCT->FIELD),                                               \
-	        FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                             \
-	  format(                                                                                    \
-	    output, "{0:" FORMAT__SELECT(1, ARG) "},\n", (FORMATTER, FORMAT_OBJ_STRUCT->FIELD)));
+	{                                                                                            \
+		const int format_result__1 = format(output,                                              \
+		                                    "{:>{1}}{2} = ",                                     \
+		                                    "",                                                  \
+		                                    FORMAT_OBJ_WIDTH * FORMAT__SELECT(0, CONST),         \
+		                                    FORMAT__STRINGIFY(FIELD));                           \
+		if (format_result__1 != 0)                                                               \
+			return format_result__1;                                                             \
+		const int format_result__2 = FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, ARG))(                   \
+		  format(output,                                                                         \
+		         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                            \
+		         (FORMATTER, FORMAT_OBJ_STRUCT->FIELD),                                          \
+		         FORMAT__SELECT(2, FORMAT__EXPAND ARG)))(                                        \
+		  format(output,                                                                         \
+		         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                            \
+		         (FORMATTER, FORMAT_OBJ_STRUCT->FIELD)));                                        \
+		if (format_result__2 != 0)                                                               \
+			return format_result__2;                                                             \
+	}
 
 /* Triplet: (tag, data, field) */
 #define FORMAT__OBJ_MAPPER_T(N, CONST, ARG, TAG, DATA, FIELD)                                    \
-	format(output,                                                                               \
-	       "{:>{1}}{2} = ",                                                                      \
-	       "",                                                                                   \
-	       FORMAT_OBJ_WIDTH* FORMAT__SELECT(0, CONST),                                           \
-	       FORMAT__STRINGIFY(FIELD));                                                            \
-	FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, FORMAT__EXPAND ARG))(                                     \
-	  format(output,                                                                             \
-	         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                                \
-	         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD),                                              \
-	         FORMAT__SELECT(2, ARG)))(format(output,                                             \
-	                                         "{0:" FORMAT__SELECT(1, ARG) "},\n",                \
-	                                         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD)));
+	{                                                                                            \
+		const int format_result__1 = format(output,                                              \
+		                                    "{:>{1}}{2} = ",                                     \
+		                                    "",                                                  \
+		                                    FORMAT_OBJ_WIDTH * FORMAT__SELECT(0, CONST),         \
+		                                    FORMAT__STRINGIFY(FIELD));                           \
+		if (format_result__1 != 0)                                                               \
+			return format_result__1;                                                             \
+		const int format_result__2 = FORMAT__IF_ELSE(FORMAT__HAS_ARG(2, FORMAT__EXPAND ARG))(    \
+		  format(output,                                                                         \
+		         "{0:" FORMAT__SELECT(1, ARG) "},\n",                                            \
+		         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD),                                          \
+		         FORMAT__SELECT(2, ARG)))(format(output,                                         \
+		                                         "{0:" FORMAT__SELECT(1, ARG) "},\n",            \
+		                                         (TAG, DATA, FORMAT_OBJ_STRUCT->FIELD)));        \
+		if (format_result__2 != 0)                                                               \
+			return format_result__2;                                                             \
+	}
 
 /* Send to single, pair, triplet object arg formatter */
 #define FORMAT__OBJ_MAPPER(N, CONST, ARG)                                                        \
@@ -1243,6 +1266,8 @@ format__collection_array_width(struct format_arg_collection* collection,
 	                                                          const struct format_env* env,      \
 	                                                          size_t idx)                        \
 	{                                                                                            \
+		FORMAT__START_DIAG(clang)                                                                \
+		FORMAT__DIAG(clang, ignored "-Wc2y-extensions")                                          \
 		size_t format_depth__ = 1;                                                               \
 		size_t i = 0;                                                                            \
 		if (*fmt_spec != '}')                                                                    \
@@ -1252,7 +1277,9 @@ format__collection_array_width(struct format_arg_collection* collection,
 		const TYPE* FORMAT_OBJ_STRUCT = (const TYPE*)env->args[idx].data;                        \
 		assert(FORMAT_OBJ_STRUCT != NULL && "Cannot format a NULL object");                      \
                                                                                                  \
-		format(output, "{} {{\n", #TYPE);  \
+		const int format_result__1 = format(output, "{} {{\n", (const char*)#TYPE);                           \
+		if (format_result__1 != 0)                                                               \
+			return format_result__1;                                                             \
 		enum                                                                                     \
 		{                                                                                        \
 			counter_base = __COUNTER__                                                           \
@@ -1260,8 +1287,10 @@ format__collection_array_width(struct format_arg_collection* collection,
 		FORMAT__EXPAND(FORMAT__EVAL_O(                                                           \
 		  FORMAT__MAP_CONST_N(counter_base, FORMAT__OBJ_MAPPER, (format_depth__), __VA_ARGS__))) \
                                                                                                  \
-		format(output, "{0:>{1}}}}", "", FORMAT_OBJ_WIDTH * (format_depth__ - 1));               \
-		return 0;                                                                                \
+		const int format_result__2 =                                                             \
+		  format(output, "{0:>{1}}}}", "", FORMAT_OBJ_WIDTH * (format_depth__ - 1));             \
+		return format_result__2;                                                                 \
+		FORMAT__END_DIAG(clang)                                                                  \
 	}
 #define FORMAT_OBJ_STRUCT format_object__
 #define FORMAT_SUBOBJ(FORMATTER, FIELD) (SUBOBJECT, FORMATTER, FIELD)

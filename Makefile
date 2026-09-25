@@ -1,10 +1,17 @@
 NAME := fmt
-CC := gcc
+CC ?= gcc
 AR := ar
 ARFLAGS := rcs
 CFLAGS := -Wall -Wextra -Wconversion -pedantic -ggdb -std=gnu23
 IFLAGS := -I./include
 LFLAGS :=
+
+# Test-only compiler flags
+ifeq ($(findstring clang,$(notdir $(CC))),clang)
+TEST_CFLAGS := -fmacro-backtrace-limit=0
+else
+TEST_CFLAGS := -ftrack-macro-expansion=0
+endif
 
 SOURCES := $(shell find src -name '*.c')
 OBJECTS := $(addprefix build/,$(SOURCES:.c=.o))
@@ -34,7 +41,7 @@ build/%.o: %.c
 
 build/tests/%.o: tests/%.c
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -ftrack-macro-expansion=2 $(IFLAGS) -I$(CRITERION_SRC)/include -c $< -o $@
+	$(CC) $(CFLAGS) $(TEST_CFLAGS) $(IFLAGS) -I$(CRITERION_SRC)/include -c $< -o $@
 
 # ---------
 # Criterion
@@ -54,7 +61,7 @@ $(CRITERION_PC): $(CRITERION_BUILD)/build.ninja
 
 $(TEST): $(TEST_OBJECTS) $(LIB) $(CRITERION_PC)
 	@mkdir -p $(@D)
-	$(CC) -ftrack-macro-expansion=2 $(CFLAGS) $(IFLAGS) \
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) $(IFLAGS) \
 		$$(PKG_CONFIG_PATH=$(CRITERION_PKGCONFIG) pkg-config --static --cflags criterion) \
 		-o $@ \
 		$(TEST_OBJECTS) \

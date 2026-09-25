@@ -50,11 +50,11 @@ static inline void print_buffer(const char *buf, size_t len)
 			printf("%c", buf[i]);
 		else
 		{
-			const size_t len = utf8_len(&buf[i], len - i);
-			if (len != 0)
+			const size_t clen = utf8_len(&buf[i], len - i);
+			if (clen != 0)
 			{
 				printf("%.*s", (int)len, &buf[i]);
-				i += len - 1;
+				i += clen - 1;
 			}
 			else
 				printf("\033[36m\\x%hhx\033[0m", (unsigned char)buf[i]);
@@ -63,17 +63,23 @@ static inline void print_buffer(const char *buf, size_t len)
 	printf("\" [%zu]\n", len);
 }
 
+static inline void cleanup_buf(char **buf)
+{
+	free(*buf);
+}
+
 #define test_printf(fmt_format_, fmt_printf_, ...) \
 do { \
 	FORMAT__START_DIAG(gcc) \
 	FORMAT__START_DIAG(clang) \
 	FORMAT__DIAG(gcc, ignored "-Wformat") \
 	FORMAT__DIAG(clang, ignored "-Wformat") \
-	char *buf; \
+	char __attribute__((cleanup(cleanup_buf))) *buf = NULL; \
 	int len = asprintf(&buf, fmt_printf_, __VA_ARGS__); \
 	{ \
 		struct format_output out = format_output_buf(); \
-		format(&out, fmt_format_, __VA_ARGS__); \
+		const int result__ = format(&out, fmt_format_, __VA_ARGS__); \
+		cr_assert(result__ == 0); \
 		if (out.size != (size_t)len || memcmp(out.data, buf, out.size) != 0) \
 		{ \
 			printf("Got:\n"); \
@@ -91,7 +97,8 @@ do { \
 		size_t data_size = 0; \
 		FILE *f = open_memstream(&data_buf, &data_size); \
 		struct format_output out = format_output_file(f); \
-		format(&out, fmt_format_, __VA_ARGS__); \
+		const int result__ = format(&out, fmt_format_, __VA_ARGS__); \
+		cr_assert(result__ == 0); \
 		format_output_destroy(&out); \
 		fclose(f); \
 		if (data_size != (size_t)len || memcmp(data_buf, buf, data_size) != 0) \
@@ -113,7 +120,8 @@ do { \
 		cr_assert(fd != -1, "Failed to open memory fd"); \
 		shm_unlink(name); \
 		struct format_output out = format_output_fd(fd); \
-		format(&out, fmt_format_, __VA_ARGS__); \
+		const int result__ = format(&out, fmt_format_, __VA_ARGS__); \
+		cr_assert(result__ == 0); \
 		format_output_destroy(&out); \
 		off_t size = lseek(fd, 0, SEEK_END); \
 		lseek(fd, 0, SEEK_SET); \
@@ -132,7 +140,6 @@ do { \
 		close(fd); \
 		free(data); \
 	} \
-	free(buf); \
 	FORMAT__END_DIAG(clang) \
 	FORMAT__END_DIAG(gcc) \
 } while (false)
@@ -146,7 +153,8 @@ do { \
 	const size_t len = strlen(expected_); \
 	{ \
 		struct format_output out__ = format_output_buf(); \
-		format(&out__, fmt_format_, __VA_ARGS__); \
+		const int result__ = format(&out__, fmt_format_, __VA_ARGS__); \
+		cr_assert(result__ == 0); \
 		if (out__.size != len || memcmp(out__.data, expected_, out__.size) != 0) \
 		{ \
 			printf("Got:\n"); \
@@ -164,7 +172,8 @@ do { \
 		size_t data_size = 0; \
 		FILE *f = open_memstream(&data_buf, &data_size); \
 		struct format_output out__ = format_output_file(f); \
-		format(&out__, fmt_format_, __VA_ARGS__); \
+		const int result__ = format(&out__, fmt_format_, __VA_ARGS__); \
+		cr_assert(result__ == 0); \
 		format_output_destroy(&out__); \
 		fclose(f); \
 		if (data_size != (size_t)len || memcmp(data_buf, expected_, data_size) != 0) \
@@ -186,7 +195,8 @@ do { \
 		cr_assert(fd != -1, "Failed to open memory fd"); \
 		shm_unlink(name); \
 		struct format_output out__ = format_output_fd(fd); \
-		format(&out__, fmt_format_, __VA_ARGS__); \
+		const int result__ = format(&out__, fmt_format_, __VA_ARGS__); \
+		cr_assert(result__ == 0); \
 		format_output_destroy(&out__); \
 		off_t size = lseek(fd, 0, SEEK_END); \
 		lseek(fd, 0, SEEK_SET); \
@@ -217,6 +227,7 @@ do { \
 	type_ varname_ = CONCAT(foreach_array_, id_)[0]; \
 	for (size_t idx_ = 0; idx_ < sizeof(CONCAT(foreach_array_, id_)) / sizeof(type_); varname_ = CONCAT(foreach_array_, id_)[++idx_])
 #define for_each_(id_, type_, varname_, ...) for_each__(id_, type_, varname_, __VA_ARGS__)
-#define for_each(type_, varname_, ...) for_each_(__COUNTER__, type_, varname_, __VA_ARGS__)
+#define for_each(type_, varname_, ...) FORMAT__START_DIAG(clang) FORMAT__DIAG(clang, ignored "-Wc2y-extensions") for_each_(__COUNTER__, type_, varname_, __VA_ARGS__) FORMAT__END_DIAG(clang)
+
 	
 #endif // FORMAT_TESTS_UTIL_H

@@ -318,7 +318,8 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 			assert(env.args[index].formatter != NULL);
 			env.args[index].formatter(output, sep, &env, index);
 		} else if (env.args[index].type == kFormatCollection) {
-			format_fmt_collection(output, sep, &env, index);
+			if (format_fmt_collection(output, sep, &env, index))
+				return -1;
 		}
 		i = end + 1;
 	}

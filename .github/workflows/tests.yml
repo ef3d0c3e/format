@@ -1,0 +1,63 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Test (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - gcc
+          - clang
+
+    container: debian:sid
+
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            ca-certificates \
+            git \
+            make \
+            gcc \
+            clang \
+            meson \
+            ninja-build \
+            cmake \
+            pkg-config \
+            libcriterion-dev \
+            libgpg-error-dev \
+            libzstd-dev
+
+      - name: Checkout repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "${GITHUB_WORKSPACE}"
+
+          git init
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          git remote add origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          git fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --detach "${GITHUB_SHA}"
+
+          git submodule update --init --recursive
+
+      - name: Show compiler version
+        env:
+          CC: ${{ matrix.compiler }}
+        run: $CC --version
+
+      - name: Test
+        env:
+          CC: ${{ matrix.compiler }}
+        run: make test

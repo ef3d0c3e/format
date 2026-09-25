@@ -72,7 +72,6 @@ format_parse_size(const char* fmt_spec, size_t* i, const struct format_env* env)
 		}
 		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
 		++*i;
-		// TODO enforce variant
 		size = (size_t)env->args[size].data;
 		assert(size <= 16384 && "Size cannot exceed 16384");
 	}
