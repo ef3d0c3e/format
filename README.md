@@ -87,6 +87,16 @@ Here are the possible alignment:
  * `format(out, "{:?}", "\nT\x87") -> "\nT\x87"`
  * `format(out, "{:x}", "\nT\x87") -> "0x0AT0x87"`
 
+### Char
+
+<p><b>format_string</b> := <a href="#alignment">alignment?</a> <em> alignment</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; <a href="#size">size?</a> <em> width of the formatted string</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; (<b>'#'</b> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; <a href="#specifier">spec</a> <em> right quote</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; <a href="#specifier">spec</a> <em> left quote</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; )? <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; ( <b>'c'</b> | <b>'?'</b> | <b>'x'</b> )? <em>display type</em></p>
+
 ### Signed Integers
 
 Most common signed integer types can be formatted: `signed char, short, int, long, long long`

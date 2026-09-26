@@ -18,11 +18,11 @@
 #include "fmt.h"
 
 /**
- * @file fmt_str.c
- * @brief String formatting
+ * @file fmt_char.c
+ * @brief Char formatting
  */
 
-struct string_spec
+struct char_spec
 {
 	/** @brief Fill string */
 	struct format_spec_placeholder fill;
@@ -41,11 +41,9 @@ struct string_spec
 	struct format_spec_placeholder left_quote;
 	/** @brief Right quote */
 	struct format_spec_placeholder right_quote;
-	/** @brief Field precision */
-	size_t precision;
 	/**
 	 * @brief Display type
-	 *  - 's' Display characters as is (default)
+	 *  - 'c' Display characters as is (default)
 	 *  - '?' Display non printable using common escape sequences or as `\xXX`
 	 *  - 'x' Display non printables as `0xXX`
 	 */
@@ -54,15 +52,14 @@ struct string_spec
 	const char* left;
 };
 
-static inline struct string_spec
-parse_string_spec(const char* fmt_spec, const struct format_env* env)
+static inline struct char_spec
+parse_char_spec(const char* fmt_spec, const struct format_env* env)
 {
-	struct string_spec spec = {
+	struct char_spec spec = {
 		.align = '<', /* Left-aligned by default */
 		.width = 0,
 		.quoted = 0,
-		.precision = (size_t)-1, /* Sentinel */
-		.type = 's',
+		.type = 'c',
 		.left = fmt_spec,
 	};
 
@@ -84,16 +81,11 @@ parse_string_spec(const char* fmt_spec, const struct format_env* env)
 		spec.right_quote = format_parse_placeholder(fmt_spec, &i, env);
 	}
 
-	/* Parse precision */
-	if (fmt_spec[i] == '.') {
-		++i;
-		spec.precision = format_parse_size(fmt_spec, &i, env);
-	}
-
 	/* Parse type */
 	if (fmt_spec[i] != '}') {
+		printf("left = '%s'\n", fmt_spec + i);
 		spec.type = fmt_spec[i++];
-		assert(strchr("s?x", spec.type) && "Invalid display type");
+		assert(strchr("c?x", spec.type) && "Invalid display type");
 	}
 
 	spec.left = fmt_spec + i;
@@ -101,41 +93,26 @@ parse_string_spec(const char* fmt_spec, const struct format_env* env)
 }
 
 int
-format_fmt_str(struct format_output* output,
-               const char* fmt_spec,
-               const struct format_env* env,
-               size_t idx)
+format_fmt_char(struct format_output* output,
+                const char* fmt_spec,
+                const struct format_env* env,
+                size_t idx)
 {
-	struct string_spec spec = parse_string_spec(fmt_spec, env);
+	struct char_spec spec = parse_char_spec(fmt_spec, env);
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
-	const char* val = (const char*)env->args[idx].data;
-	assert(val != NULL && "Cannot format a NULL string");
-
-	/* Number of bytes to display */
-	size_t len = 0;
-	if (spec.precision == (size_t)-1)
-		len = strlen(val);
-	else
-		len = strnlen(val, spec.precision);
+	const char val = (char)env->args[idx].data;
 
 	/* Compute display width */
 	size_t width = 0;
 	if (spec.quoted)
 		width += spec.left_quote.width + spec.right_quote.width;
-	for (size_t i = 0; i < len;) {
-		const size_t cp = format_utf8_len(val + i, len - i);
-		if (cp == 1) {
-			if (isprint(val[i]) || val[i] == '\t')
-				width += 1;
-			else if (val[i] != 0 && strchr("\a\b\n\v\f\r", val[i]) && spec.type == '?')
-				width += 2;
-			else
-				width += spec.type == 's' ? 1 : 4 /* \xXX or 0xXX */;
-		} else if (cp > 1)
-			width += 1;
-		i += cp ? cp : 1;
-	}
+	if (isprint(val) || val == '\t')
+		width += 1;
+	else if (val != 0 && strchr("\a\b\n\v\f\r", val) && spec.type == '?')
+		width += 2;
+	else
+		width += spec.type == 'c' ? 1 : 4 /* \xXX or 0xXX */;
 
 	/* Compute alignment */
 	size_t left = 0, right = 0;
@@ -166,73 +143,60 @@ format_fmt_str(struct format_output* output,
 
 	/* Content */
 	char buf[16];
-	for (size_t i = 0; i < len;) {
-		const size_t cp = format_utf8_len(val + i, len - i);
-		if (cp == 0) {
-			/* Write as-is */
-			if (format_output_write(output, val + i, 1))
-				return -1;
-		} else if (cp == 1) {
-			if (isprint(val[i]) || val[i] == '\t') {
-				if (format_output_write(output, val + i, 1))
-					return -1;
-			} else if (val[i] != 0 && strchr("\a\b\n\v\f\r", val[i]) && spec.type == '?') {
-				buf[0] = '\\';
-				switch (val[i]) {
-					case '\a':
-						buf[1] = 'a';
-						break;
-					case '\b':
-						buf[1] = 'b';
-						break;
-					case '\n':
-						buf[1] = 'n';
-						break;
-					case '\v':
-						buf[1] = 'v';
-						break;
-					case '\f':
-						buf[1] = 'f';
-						break;
-					case '\r':
-						buf[1] = 'r';
-						break;
-					default:
-						format_unreachable();
-				}
-				if (format_output_write(output, buf, 2))
-					return -1;
-			} else {
-				switch (spec.type) {
-					case 's':
-						if (format_output_write(output, val + i, 1))
-							return -1;
-						break;
-					case '?':
-						buf[0] = '\\';
-						buf[1] = 'x';
-						buf[2] = FORMAT_HEX[(unsigned char)val[i] / 16];
-						buf[3] = FORMAT_HEX[(unsigned char)val[i] % 16];
-						if (format_output_write(output, buf, 4))
-							return -1;
-						break;
-					case 'x':
-						buf[0] = '0';
-						buf[1] = 'x';
-						buf[2] = FORMAT_HEX[(unsigned char)val[i] / 16];
-						buf[3] = FORMAT_HEX[(unsigned char)val[i] % 16];
-						if (format_output_write(output, buf, 4))
-							return -1;
-						break;
-					default:
-						format_unreachable();
-				}
-			}
-		} else if (cp > 1) {
-			if (format_output_write(output, val + i, cp))
-				return -1;
+	if (isprint(val) || val == '\t') {
+		if (format_output_write(output, &val, 1))
+			return -1;
+	} else if (val != 0 && strchr("\a\b\n\v\f\r", val) && spec.type == '?') {
+		buf[0] = '\\';
+		switch (val) {
+			case '\a':
+				buf[1] = 'a';
+				break;
+			case '\b':
+				buf[1] = 'b';
+				break;
+			case '\n':
+				buf[1] = 'n';
+				break;
+			case '\v':
+				buf[1] = 'v';
+				break;
+			case '\f':
+				buf[1] = 'f';
+				break;
+			case '\r':
+				buf[1] = 'r';
+				break;
+			default:
+				format_unreachable();
 		}
-		i += cp ? cp : 1;
+		if (format_output_write(output, buf, 2))
+			return -1;
+	} else {
+		switch (spec.type) {
+			case 'c':
+				if (format_output_write(output, &val, 1))
+					return -1;
+				break;
+			case '?':
+				buf[0] = '\\';
+				buf[1] = 'x';
+				buf[2] = FORMAT_HEX[(unsigned char)val / 16];
+				buf[3] = FORMAT_HEX[(unsigned char)val % 16];
+				if (format_output_write(output, buf, 4))
+					return -1;
+				break;
+			case 'x':
+				buf[0] = '0';
+				buf[1] = 'x';
+				buf[2] = FORMAT_HEX[(unsigned char)val / 16];
+				buf[3] = FORMAT_HEX[(unsigned char)val % 16];
+				if (format_output_write(output, buf, 4))
+					return -1;
+				break;
+			default:
+				format_unreachable();
+		}
 	}
 
 	/* Right quote */
