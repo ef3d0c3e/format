@@ -56,6 +56,14 @@ struct format_output;
 #define format_nonnull(...)
 #endif
 
+/** @brief `format_unused` null checks */
+#if __has_attribute(unused)
+#define format_unused __attribute__((unused))
+#else
+#warning Disabling format_unused
+#define format_unused
+#endif
+
 /** @brief `format_returns_nonnull` ensure function returns non-NULL */
 #if __has_attribute(returns_nonnull)
 #define format_returns_nonnull __attribute__((returns_nonnull))
@@ -70,6 +78,20 @@ struct format_output;
 #else
 #warning Disabling format_warn_unused_result
 #define format_warn_unused_result
+#endif
+
+/** @brief `format_static_assert` implementation */
+#if defined(_Static_assert)
+#define FORMAT__STATIC_ASSERT(cond, ...) _Static_assert(cond, __VA_ARGS__)
+#else
+#define FORMAT___STATIC_ASSERT2(ident_, cond, ...) typedef char ident_[(cond) ? 1 : -1] format_unused
+#define FORMAT___STATIC_ASSERT1(ident_, id_, cond, ...) FORMAT___STATIC_ASSERT2(ident_##id_, cond, __VA_ARGS__)
+#define FORMAT___STATIC_ASSERT0(ident_, id_, cond, ...) FORMAT___STATIC_ASSERT1(ident_, id_, cond, __VA_ARGS__)
+#define FORMAT__STATIC_ASSERT(cond, ...)                                                              \
+	FORMAT__START_DIAG(clang) \
+	FORMAT__DIAG(clang, ignored "-Wc2y-extensions") \
+	FORMAT___STATIC_ASSERT0(format__static_assert_, __COUNTER__, cond, __VA_ARGS__)\
+	FORMAT__END_DIAG(clang)
 #endif
 
 /**
@@ -213,7 +235,7 @@ struct format_arg
 		                 size_t idx);
 		/** @brief Collector accessor */
 		struct format_arg_collection collection;
-	};
+	} payload;
 	/** @brief Raw data, value to format */
 	uintptr_t data;
 };
@@ -373,7 +395,7 @@ struct format_spec_placeholder
 	{
 		char codepoint[5];
 		const char* str;
-	};
+	} data;
 	/** @brief Number of bytes in the string (strlen) */
 	size_t len;
 	/** @brief Number of codepoints in the string */
@@ -824,14 +846,14 @@ format_fmt_collection(struct format_output* output,
 #define FORMAT___IS_PAIR_4(b, ...) FORMAT__NOT(FORMAT__HAS_ARGS(__VA_ARGS__))
 #define FORMAT__IS_PAIR(...) FORMAT___IS_PAIR_1(__VA_ARGS__)
 
-_Static_assert(!FORMAT__IS_PAIR());
-_Static_assert(!FORMAT__IS_PAIR(0));
-_Static_assert(!FORMAT__IS_PAIR(0, 1));
-_Static_assert(!FORMAT__IS_PAIR(0, 1, 2));
-_Static_assert(!FORMAT__IS_PAIR(()));
-_Static_assert(!FORMAT__IS_PAIR((0)));
-_Static_assert(FORMAT__IS_PAIR((0, 1)));
-_Static_assert(!FORMAT__IS_PAIR((0, 1, 2)));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_PAIR());
+FORMAT__STATIC_ASSERT(!FORMAT__IS_PAIR(0));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_PAIR(0, 1));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_PAIR(0, 1, 2));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_PAIR(()));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_PAIR((0)));
+FORMAT__STATIC_ASSERT(FORMAT__IS_PAIR((0, 1)));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_PAIR((0, 1, 2)));
 
 #define FORMAT___IS_TRIPLET_1(first, ...)                                                        \
 	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(0)(FORMAT___IS_TRIPLET_2(first))
@@ -846,16 +868,16 @@ _Static_assert(!FORMAT__IS_PAIR((0, 1, 2)));
 #define FORMAT___IS_TRIPLET_5(c, ...) FORMAT__NOT(FORMAT__HAS_ARGS(__VA_ARGS__))
 #define FORMAT__IS_TRIPLET(...) FORMAT___IS_TRIPLET_1(__VA_ARGS__)
 
-_Static_assert(!FORMAT__IS_TRIPLET());
-_Static_assert(!FORMAT__IS_TRIPLET(0));
-_Static_assert(!FORMAT__IS_TRIPLET(0, 1));
-_Static_assert(!FORMAT__IS_TRIPLET(0, 1, 2));
-_Static_assert(!FORMAT__IS_TRIPLET(0, 1, 2, 4));
-_Static_assert(!FORMAT__IS_TRIPLET(()));
-_Static_assert(!FORMAT__IS_TRIPLET((0)));
-_Static_assert(!FORMAT__IS_TRIPLET((0, 1)));
-_Static_assert(FORMAT__IS_TRIPLET((0, 1, 2)));
-_Static_assert(!FORMAT__IS_TRIPLET((0, 1, 2, 4)));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET());
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET(0));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET(0, 1));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET(0, 1, 2));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET(0, 1, 2, 4));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET(()));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET((0)));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET((0, 1)));
+FORMAT__STATIC_ASSERT(FORMAT__IS_TRIPLET((0, 1, 2)));
+FORMAT__STATIC_ASSERT(!FORMAT__IS_TRIPLET((0, 1, 2, 4)));
 
 #define FORMAT__IS_POINTER_VAR_P(VAR)                                                            \
 	(__builtin_classify_type(VAR) == __builtin_classify_type((void*)0))
@@ -907,25 +929,25 @@ _Static_assert(!FORMAT__IS_TRIPLET((0, 1, 2, 4)));
 #define FORMAT__SELECT(...)                                                                      \
 	FORMAT__EXPAND(FORMAT__CAT(FORMAT___SELECT_, FORMAT___SELECT_NARG(__VA_ARGS__))(__VA_ARGS__))
 
-_Static_assert(FORMAT___SELECT_GET(0, (7, 8, 9)) == 7);
-_Static_assert(FORMAT___SELECT_GET(1, (7, 8, 9)) == 8);
-_Static_assert(FORMAT___SELECT_GET(2, (7, 8, 9)) == 9);
+FORMAT__STATIC_ASSERT(FORMAT___SELECT_GET(0, (7, 8, 9)) == 7);
+FORMAT__STATIC_ASSERT(FORMAT___SELECT_GET(1, (7, 8, 9)) == 8);
+FORMAT__STATIC_ASSERT(FORMAT___SELECT_GET(2, (7, 8, 9)) == 9);
 
-_Static_assert(FORMAT__SELECT(0, (10, 20, 30, 40)) == 10);
-_Static_assert(FORMAT__SELECT(1, (10, 20, 30, 40)) == 20);
-_Static_assert(FORMAT__SELECT(2, (10, 20, 30, 40)) == 30);
-_Static_assert(FORMAT__SELECT(3, (10, 20, 30, 40)) == 40);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(0, (10, 20, 30, 40)) == 10);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(1, (10, 20, 30, 40)) == 20);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(2, (10, 20, 30, 40)) == 30);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(3, (10, 20, 30, 40)) == 40);
 
-_Static_assert(FORMAT__SELECT(1, 0, (100, (200, 300))) == 200);
-_Static_assert(FORMAT__SELECT(1, 1, (100, (200, 300))) == 300);
-_Static_assert(FORMAT__SELECT(0, 0, ((1, 2), (3, 4))) == 1);
-_Static_assert(FORMAT__SELECT(0, 1, ((1, 2), (3, 4))) == 2);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(1, 0, (100, (200, 300))) == 200);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(1, 1, (100, (200, 300))) == 300);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(0, 0, ((1, 2), (3, 4))) == 1);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(0, 1, ((1, 2), (3, 4))) == 2);
 
-_Static_assert(FORMAT__SELECT(1, 1, 0, (1, (2, (3, 4)))) == 3);
-_Static_assert(FORMAT__SELECT(1, 1, 1, (1, (2, (3, 4)))) == 4);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(1, 1, 0, (1, (2, (3, 4)))) == 3);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(1, 1, 1, (1, (2, (3, 4)))) == 4);
 
-_Static_assert(FORMAT__SELECT(1, 1, 1, 0, (1, (2, (3, (4, 5))))) == 4);
-_Static_assert(FORMAT__SELECT(1, 1, 1, 1, (1, (2, (3, (4, 5))))) == 5);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(1, 1, 1, 0, (1, (2, (3, (4, 5))))) == 4);
+FORMAT__STATIC_ASSERT(FORMAT__SELECT(1, 1, 1, 1, (1, (2, (3, (4, 5))))) == 5);
 
 #define FORMAT___HAS_ARG_0 (0, 0, 0, 0, 0, 0, 0, 0)
 #define FORMAT___HAS_ARG_1 (1, 0, 0, 0, 0, 0, 0, 0)
@@ -940,29 +962,29 @@ _Static_assert(FORMAT__SELECT(1, 1, 1, 1, (1, (2, (3, (4, 5))))) == 5);
 #define FORMAT__HAS_ARG(N, ...)                                                                  \
 	FORMAT___SELECT_GET(N, FORMAT__CAT(FORMAT___HAS_ARG_, FORMAT___SELECT_NARG(__VA_ARGS__)))
 
-_Static_assert(!FORMAT__HAS_ARG(3));
+FORMAT__STATIC_ASSERT(!FORMAT__HAS_ARG(3));
 
-_Static_assert(FORMAT__HAS_ARG(0, 42));
-_Static_assert(!FORMAT__HAS_ARG(1, 42));
+FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(0, 42));
+FORMAT__STATIC_ASSERT(!FORMAT__HAS_ARG(1, 42));
 
-_Static_assert(FORMAT__HAS_ARG(0, 1, 2, 3));
-_Static_assert(FORMAT__HAS_ARG(1, 1, 2, 3));
-_Static_assert(FORMAT__HAS_ARG(2, 1, 2, 3));
-_Static_assert(!FORMAT__HAS_ARG(3, 1, 2, 3));
-_Static_assert(!FORMAT__HAS_ARG(7, 1, 2, 3));
+FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(0, 1, 2, 3));
+FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(1, 1, 2, 3));
+FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, 1, 2, 3));
+FORMAT__STATIC_ASSERT(!FORMAT__HAS_ARG(3, 1, 2, 3));
+FORMAT__STATIC_ASSERT(!FORMAT__HAS_ARG(7, 1, 2, 3));
 
-_Static_assert(FORMAT__HAS_ARG(7, 0, 1, 2, 3, 4, 5, 6, 7));
-_Static_assert(!FORMAT__HAS_ARG(7, 0, 1, 2, 3, 4, 5, 6));
+FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(7, 0, 1, 2, 3, 4, 5, 6, 7));
+FORMAT__STATIC_ASSERT(!FORMAT__HAS_ARG(7, 0, 1, 2, 3, 4, 5, 6));
 
-_Static_assert(FORMAT__HAS_ARG(1, (1, 2), (3, 4)));
-_Static_assert(!FORMAT__HAS_ARG(2, (1, 2), (3, 4)));
-_Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
+FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(1, (1, 2), (3, 4)));
+FORMAT__STATIC_ASSERT(!FORMAT__HAS_ARG(2, (1, 2), (3, 4)));
+FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 
 /** @} */
 
 #define FORMAT__MAPPER_CHOOSE(ARG, RULE)                                                         \
 	__builtin_choose_expr(__builtin_types_compatible_p(FORMAT__SELECT(0, RULE), typeof(ARG)),    \
-	                      format_arg__.formatter = FORMAT__SELECT(1, RULE),                      \
+	                      format_arg__.payload.formatter = FORMAT__SELECT(1, RULE),                      \
 	                      (void)0);
 #define FORMAT__CHOOSE(ARG)                                                                      \
 	FORMAT__EXPAND(                                                                              \
@@ -990,16 +1012,16 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 	format_arg__.type = kFormatCollection;                                                       \
 	typeof(*FIELD)* format_arg_triplet__ = FIELD;                                                \
 	(void)format_arg_triplet__;                                                                  \
-	format_arg__.collection = (DATA);                                                            \
-	assert(format_arg__.collection.next != NULL);                                                \
-	assert(format_arg__.collection.width != NULL);                                               \
-	assert(format_arg__.collection.formatter != NULL);                                           \
+	format_arg__.payload.collection = (DATA);                                                            \
+	assert(format_arg__.payload.collection.next != NULL);                                                \
+	assert(format_arg__.payload.collection.width != NULL);                                               \
+	assert(format_arg__.payload.collection.formatter != NULL);                                           \
 	format_arg__.data = (uintptr_t)(FIELD);
 #define FORMAT__FORMATTER_TRIPLET_SUBOBJECT(FORMATTER, FIELD)                                    \
 	typeof(FIELD)* format_arg_triplet__ = (&FIELD);                                              \
 	(void)format_arg_triplet__;                                                                  \
 	format_arg__.type = kFormatScalar;                                                           \
-	format_arg__.formatter = (FORMATTER);                                                        \
+	format_arg__.payload.formatter = (FORMATTER);                                                        \
 	format_arg__.data = (uintptr_t)(&FIELD);
 #define FORMAT__FORMATTER_TRIPLET(TAG, X, Y) FORMAT__CAT(FORMAT__FORMATTER_TRIPLET_, TAG)(X, Y)
 
@@ -1009,18 +1031,18 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 
 #define FORMAT__MAPPER(ARG)                                                                      \
 	__extension__({                                                                              \
-		_Static_assert((FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)) ||                   \
-		                sizeof(FORMAT__MAPPER_VALUE(ARG)) <= sizeof(uint64_t)) &&                \
-		               "Cannot format type, did you mean to use a pointer instead?");            \
+		FORMAT__STATIC_ASSERT((FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)) ||            \
+		                       sizeof(FORMAT__MAPPER_VALUE(ARG)) <= sizeof(uint64_t)) &&         \
+		                      "Cannot format type, did you mean to use a pointer instead?");     \
 		struct format_arg format_arg__;                                                          \
 		format_arg__.type = kFormatScalar;                                                       \
 		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__FORMATTER_TRIPLET(                      \
 		  FORMAT__SELECT(0, ARG), FORMAT__SELECT(1, ARG), FORMAT__SELECT(2, ARG)))(              \
-		  FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(format_arg__.formatter =                         \
+		  FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(format_arg__.payload.formatter =                         \
 		                                          FORMAT__SELECT(0, ARG))(FORMAT__CHOOSE(ARG))); \
 		FORMAT__IF_ELSE(                                                                         \
 		  FORMAT__IS_TRIPLET(ARG))()(/* respect strict-aliasing */                               \
-		                             assert(format_arg__.formatter != NULL &&                    \
+		                             assert(format_arg__.payload.formatter != NULL &&                    \
 		                                    "Could not find formatter for argument"));           \
 		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))()(                                              \
 		  format_arg__.data = __builtin_choose_expr(                                             \
@@ -1030,7 +1052,7 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 			    const typeof(FORMAT__MAPPER_VALUE(ARG)) format_temp__ =                          \
 			      FORMAT__MAPPER_VALUE(ARG);                                                     \
 			    typeof(format_arg__.data) format_result__ = 0;                                   \
-			    _Static_assert(sizeof(typeof(format_arg__.data)) <= sizeof(uintptr_t));          \
+			    FORMAT__STATIC_ASSERT(sizeof(typeof(format_arg__.data)) <= sizeof(uintptr_t));   \
 			    memcpy(&format_result__, &format_temp__, sizeof(format_temp__));                 \
 			    format_result__;                                                                 \
 		    })));                                                                                \
@@ -1052,11 +1074,12 @@ _Static_assert(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 	__extension__({                                                                              \
 		FORMAT__START_DIAG(clang)                                                                \
 		FORMAT__DIAG(clang, ignored "-Wc2y-extensions")                                          \
-		_Static_assert(__builtin_types_compatible_p(typeof(output), struct format_output*),      \
-		               "Invalid output type");                                                   \
-		_Static_assert(__builtin_types_compatible_p(typeof(fmt), const char*) ||                 \
-		                 __builtin_types_compatible_p(typeof(fmt), const char[]),                \
-		               "Invalid format string");                                                 \
+		FORMAT__STATIC_ASSERT(                                                                   \
+		  __builtin_types_compatible_p(typeof(output), struct format_output*),                   \
+		  "Invalid output type");                                                                \
+		FORMAT__STATIC_ASSERT(__builtin_types_compatible_p(typeof(fmt), const char*) ||          \
+		                        __builtin_types_compatible_p(typeof(fmt), const char[]),         \
+		                      "Invalid format string");                                          \
 		struct format_arg format_args__[] = { FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(    \
 		  FORMAT__EXPAND(FORMAT__EVAL(FORMAT__MAP(FORMAT__MAPPER, __VA_ARGS__))))() };           \
 		int format_result__ = format_args(                                                       \
@@ -1101,7 +1124,7 @@ format__collection_array_width(struct format_arg_collection* collection,
 
 	struct format_arg arg;
 	arg.type = kFormatScalar;
-	arg.formatter = collection->formatter;
+	arg.payload.formatter = collection->formatter;
 
 	struct format_env env = {
 		.args = (struct format_arg*)&arg,
@@ -1277,7 +1300,7 @@ format__collection_array_width(struct format_arg_collection* collection,
 		const TYPE* FORMAT_OBJ_STRUCT = (const TYPE*)env->args[idx].data;                        \
 		assert(FORMAT_OBJ_STRUCT != NULL && "Cannot format a NULL object");                      \
                                                                                                  \
-		const int format_result__1 = format(output, "{} {{\n", (const char*)#TYPE);                           \
+		const int format_result__1 = format(output, "{} {{\n", (const char*)#TYPE);              \
 		if (format_result__1 != 0)                                                               \
 			return format_result__1;                                                             \
 		enum                                                                                     \

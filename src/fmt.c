@@ -132,9 +132,9 @@ format_parse_placeholder(const char* fmt_spec, size_t* i, const struct format_en
 		}
 		assert(fmt_spec[*i] == '}' && "Expected `}' after number");
 		++*i;
-		placeholder.str = (const char*)env->args[id].data;
-		placeholder.len = strlen(placeholder.str);
-		placeholder.width = utf8_len_str(placeholder.str, placeholder.len);
+		placeholder.data.str = (const char*)env->args[id].data;
+		placeholder.len = strlen(placeholder.data.str);
+		placeholder.width = utf8_len_str(placeholder.data.str, placeholder.len);
 		return placeholder;
 	}
 
@@ -144,11 +144,11 @@ format_parse_placeholder(const char* fmt_spec, size_t* i, const struct format_en
 	assert(len <= 5);
 
 	placeholder.type = 0;
-	memset(placeholder.codepoint, 0, sizeof placeholder.codepoint);
-	placeholder.codepoint[0] = '\0';
-	memcpy(placeholder.codepoint, fmt_spec + *i, len);
-	placeholder.len = strlen(placeholder.codepoint);
-	placeholder.width = utf8_len_str(placeholder.codepoint, placeholder.len);
+	memset(placeholder.data.codepoint, 0, sizeof placeholder.data.codepoint);
+	placeholder.data.codepoint[0] = '\0';
+	memcpy(placeholder.data.codepoint, fmt_spec + *i, len);
+	placeholder.len = strlen(placeholder.data.codepoint);
+	placeholder.width = utf8_len_str(placeholder.data.codepoint, placeholder.len);
 	*i += len;
 	return placeholder;
 }
@@ -165,7 +165,7 @@ format_write_placeholder(struct format_output* output,
 			max_width = 1;
 		/* Width is always 1 */
 		for (size_t i = 0; i < max_width; ++i) {
-			if (format_output_write(output, placeholder->codepoint, placeholder->len))
+			if (format_output_write(output, placeholder->data.codepoint, placeholder->len))
 				return -1;
 		}
 		return 0;
@@ -173,7 +173,7 @@ format_write_placeholder(struct format_output* output,
 
 	/* Write string content entirely exactly once */
 	if (max_width == (size_t)-1) {
-		return format_output_write(output, placeholder->str, placeholder->len);
+		return format_output_write(output, placeholder->data.str, placeholder->len);
 	}
 
 	if (placeholder->width == 0 || max_width == 0)
@@ -187,30 +187,30 @@ format_write_placeholder(struct format_output* output,
 			size_t skip = placeholder->width - remainder;
 			size_t off = 0, cps = 0;
 			while (cps < skip && off < placeholder->len) {
-				const size_t cp = format_utf8_len(placeholder->str + off, placeholder->len - off);
+				const size_t cp = format_utf8_len(placeholder->data.str + off, placeholder->len - off);
 				off += cp ? cp : 1;
 				++cps;
 			}
-			if (format_output_write(output, placeholder->str + off, placeholder->len - off))
+			if (format_output_write(output, placeholder->data.str + off, placeholder->len - off))
 				return -1;
 		}
 		for (size_t i = 0; i < full_cycles; ++i)
-			if (format_output_write(output, placeholder->str, placeholder->len))
+			if (format_output_write(output, placeholder->data.str, placeholder->len))
 				return -1;
 		return 0;
 	}
 
 	for (size_t i = 0; i < full_cycles; ++i)
-		if (format_output_write(output, placeholder->str, placeholder->len))
+		if (format_output_write(output, placeholder->data.str, placeholder->len))
 			return -1;
 	if (remainder > 0) {
 		size_t off = 0, cps = 0;
 		while (cps < remainder && off < placeholder->len) {
-			const size_t cp = format_utf8_len(placeholder->str + off, placeholder->len - off);
+			const size_t cp = format_utf8_len(placeholder->data.str + off, placeholder->len - off);
 			off += cp ? cp : 1;
 			++cps;
 		}
-		if (format_output_write(output, placeholder->str, off))
+		if (format_output_write(output, placeholder->data.str, off))
 			return -1;
 	}
 	return 0;
@@ -258,7 +258,7 @@ format_parse_alignment(const char* fmt_spec,
 		return;
 	} while (0);
 	fill->type = 1;
-	fill->str = default_placeholder;
-	fill->len = strlen(fill->str);
-	fill->width = utf8_len_str(fill->str, fill->len);
+	fill->data.str = default_placeholder;
+	fill->len = strlen(fill->data.str);
+	fill->width = utf8_len_str(fill->data.str, fill->len);
 }

@@ -5,6 +5,10 @@
 Format is a modern C formatting library.
 It provides features similar to [libfmt](https://fmt.dev) or Python's formatting facility.
 
+This library requires a Gnu99 compiler (gcc or clang). Mind you that the recommended standard version is Gnu23.
+If you use this library in a Gnu99 project, you will get warnings when including the `include/format.h` header.
+These warnings can be ignored, but you might want so silence them globally.
+
 # Grammar
 
 ## Basis

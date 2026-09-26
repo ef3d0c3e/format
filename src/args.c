@@ -315,8 +315,8 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 
 		/* Call formatter */
 		if (env.args[index].type == kFormatScalar) {
-			assert(env.args[index].formatter != NULL);
-			env.args[index].formatter(output, sep, &env, index);
+			assert(env.args[index].payload.formatter != NULL);
+			env.args[index].payload.formatter(output, sep, &env, index);
 		} else if (env.args[index].type == kFormatCollection) {
 			if (format_fmt_collection(output, sep, &env, index))
 				return -1;

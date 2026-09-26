@@ -79,17 +79,17 @@ parse_collection_spec(const char* fmt_spec, const struct format_env* env)
 	} else {
 		spec.start.type = 1;
 		spec.start.len = 1;
-		spec.start.str = "{";
+		spec.start.data.str = "{";
 		spec.start.width = 1;
 
 		spec.sep.type = 1;
 		spec.sep.len = 2;
-		spec.sep.str = ", ";
+		spec.sep.data.str = ", ";
 		spec.sep.width = 2;
 
 		spec.end.type = 1;
 		spec.end.len = 1;
-		spec.end.str = "}";
+		spec.end.data.str = "}";
 		spec.end.width = 1;
 	}
 
@@ -121,7 +121,7 @@ format_fmt_collection(struct format_output* output,
 	struct collection_spec spec = parse_collection_spec(fmt_spec, env);
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
-	struct format_arg_collection* collection = &env->args[idx].collection;
+	struct format_arg_collection* collection = &env->args[idx].payload.collection;
 	assert(collection->formatter);
 	assert(collection->width);
 
@@ -132,10 +132,10 @@ format_fmt_collection(struct format_output* output,
 
 	struct format_arg args[2];
 	args[0].type = kFormatScalar;
-	args[0].formatter = collection->formatter;
+	args[0].payload.formatter = collection->formatter;
 
 	args[1].type = kFormatScalar;
-	args[1].formatter = NULL;
+	args[1].payload.formatter = NULL;
 	args[1].data = 0;
 
 	struct format_env subenv = {
