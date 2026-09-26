@@ -83,7 +83,6 @@ parse_char_spec(const char* fmt_spec, const struct format_env* env)
 
 	/* Parse type */
 	if (fmt_spec[i] != '}') {
-		printf("left = '%s'\n", fmt_spec + i);
 		spec.type = fmt_spec[i++];
 		assert(strchr("c?x", spec.type) && "Invalid display type");
 	}
