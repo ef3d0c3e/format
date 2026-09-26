@@ -1,4 +1,4 @@
-NAME := fmt
+NAME := format
 CC ?= gcc
 AR := ar
 ARFLAGS := rcs

@@ -9,6 +9,74 @@ This library requires a Gnu99 compiler (gcc or clang). Mind you that the recomme
 If you use this library in a Gnu99 project, you will get warnings when including the `include/format.h` header.
 These warnings can be ignored, but you might want so silence them globally.
 
+# Usage
+
+## Setup
+
+To use `format` as a library to your project, I recommend the following setup:
+ * Fetch the library from git; either as a submodule, or via a make/cmake rule
+ * Compile the static `libformat.a`: `make -C libs/format`
+ * Link your binary with `libformat.a` and add `-I./libs/format/include` to access the library header `format.h`
+
+```
+# Add as git submodule, you might want to pin to a release version
+git submodule add https://github.com/ef3d0c3e/format libs/format
+```
+Add this to your makefile:
+```
+# Static libformat.a location
+LIBFORMAT_A := ./libs/format/libformat.a
+# Add to IFLAGS and LFLAGS
+IFLAGS += -I./libs/format/include/
+LFLAGS += $(LIBFORMAT_A)
+
+# Rule for building libformat.a
+$(LIBFORMAT_A):
+	@echo "Building libformat..."
+	$(MAKE) -C $(dir $(LIBFORMAT_A))
+
+# Add this all your targets that depend on libformat:
+my-target: $(LIBFORMAT_A)
+```
+
+The default make target for format builds `libformat.a`, which is what you should be using in your projects.
+
+Example program:
+```
+#include <format.h>
+
+int main()
+{
+    // You can use __attribute__((cleanup(format_output_destroy))) to avoid the call to destroy at the end
+    struct format_output out = format_output_file(stdout);
+
+    format(&out, "Hello, {}!\n", "World");
+
+    format_output_destroy(&out);
+}
+```
+
+## Outputs
+
+Format support 4 kinds of outputs, which is where `format` will write its output:
+ * `format_output_file(FILE*)` this will output to a stdio `FILE*`, it's useful if you want to use `stdout`/`stderr` and let stdio handle flushing as it already does for `printf`.
+ * `format_output_fd(int fd)` this will output to a file descriptor. By default, the output to file descriptor is buffered.
+ * `format_output_buf()` this will output to an internal buffer, that will grow dynamically to hold the formatted strings. You can make multiple calls to `format`, which will grow the buffer to contain the concatenation of all messages.
+ * `format_output_none()` this will not output, but keep track of size. This can be used to determine how many bytes it would take to format a given format string with its arguments.
+
+At any given time, if you wish to flush the formatted content, call `format_output_flush(struct format_output*)`:
+ * If the outputs is a `FILE*`, this will simply call `fflush()` on the contained `FILE*`.
+ * If the output is a file descriptor, this will write the internal buffer.
+ * Otherwise, this has no effects
+
+You can also set the flushing strategy for file descriptors. By calling `format_output_set_flush(struct format_output* output, enum format_output_flush_mode mode)`.
+Here are the available `format_output_flush_mode`:
+ - `kFormatFlushNewline` flush on newlines (similar to stdio's default strategy for `stdout`/`stderr`)
+ - `kFormatFlushNone` flush when the internal buffer is full
+ - `kFormatFlushAlways` always flush. Use this if you don't want to have a buffer
+
+**WARNING:** If you want to set the flushing mode, you must call `format_output_set_flush` BEFORE writing to the output. If you've called `format` on the output, the result is undefined.
+
 # Grammar
 
 ## Basis
@@ -172,3 +240,4 @@ See [Signed Integers](#signed_integers) for reference.
 # Planned Features
  - Float formatting
  - Proper object formatting
+ - Time formatting
