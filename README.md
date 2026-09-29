@@ -345,6 +345,14 @@ See [Signed Integers](#signed_integers) for reference.
 
 **A:** Currently, `clang` and `gcc` are supported. You need at least `C99`, but the recommended version is `C23`. `C99` compiles fine, but some features are disabled (mainly better static assertions), and `clang` complains about some features not being standard `C99`, but being supported by `GNUC`.
 
+**Q:** How are errors handler?
+
+**A:**
+ 1. An error that happens when writing to the underlying output is reported by `format`.
+A return value of `0` means success, and `-1` means an error happened.
+The library doesn't touch `errno`, so you might want to handle certain errors. Note however that errors can happen AFTER some content was written to the output.
+ 2. Any error in the format string will result in the program deliberately exiting (via assert). I've tried to make assert messages clear, so they might help you fix your format strings.
+
 **Q:** How is unicode supported?
 
 **A:** Unicode is supported at the code point level, through UTF-8.
