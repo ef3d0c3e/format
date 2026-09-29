@@ -186,51 +186,65 @@ static inline int format_warn_unused_result format_nonnull(1)
  *
  * @param fmt Format string
  * @param i Position in @p fmt, will advance
+ * @param env Format arguments
  *
  * @return Parser color in @p fmt at @p i
  */
 static inline format_color format_warn_unused_result format_nonnull(1)
-  parse_color(const char* fmt, size_t* i)
+  parse_color(const char* fmt, size_t* i, const struct format_env *env)
 {
+	if (fmt[*i] == '{')
+	{
+		size_t value = format_parse_number(fmt, i, env);
+		assert(value <= 0xFFFFFFU && "Invalid color value, expected a number in range 0..0xFFFFFF");
+		return (format_color)value;
+	}
+
 	format_color color = 0;
-	while (strchr("0123456789abcdef", tolower(fmt[*i]))) {
+	for (size_t k = 0; k < 6; ++k, ++*i)
+	{
+		if (!strchr("0123456789abcdef", tolower(fmt[*i])))
+		{
+			assert(k == 3 && "Invalid color, expected 3 or 6 hexadecimal digits");
+			color = (color & 0xF00) << 12
+				| (color & 0x0F0) << 8
+				| (color & 0x00F) << 4;
+			break;
+		}
+
 		if (isdigit(fmt[*i]))
 			color = color * 16 + (format_color)(fmt[*i] - '0');
 		else
 			color = color * 16 + 10 + (format_color)(tolower(fmt[*i]) - 'a');
-		++*i;
 	}
 	return color;
 }
 
-static inline int format_warn_unused_result format_nonnull(1, 2, 3)
-  fmt_style(struct format_output* output, const char* fmt, size_t* i)
+static inline int format_warn_unused_result format_nonnull(1, 2, 3, 4)
+  fmt_style(struct format_output* output, const char* fmt, size_t* i, const struct format_env *env)
 {
-	format_color fg = (format_color)~0U;
-	format_color bg = (format_color)~0U;
-	enum format_output_style style = kFormatStyleNone;
+	format_color fg = output->fg;
+	format_color bg = output->bg;
+	enum format_output_style style = output->style;
 
 	while (1) {
 		if (fmt[*i] == 'f' && fmt[*i + 1] == 'g' && fmt[*i + 2] == '#') {
-			assert(fg == (format_color)~0U);
 			*i += 3;
-			fg = parse_color(fmt, i);
+			fg = parse_color(fmt, i, env);
 			if (fmt[*i] == '}')
 				break;
 			assert(fmt[*i] == ' ' || fmt[*i] == '\t');
 			while (strchr(" \t", fmt[*i]))
 				++*i;
 		} else if (fmt[*i] == 'b' && fmt[*i + 1] == 'g' && fmt[*i + 2] == '#') {
-			assert(bg == (format_color)~0U);
 			*i += 3;
-			bg = parse_color(fmt, i);
+			bg = parse_color(fmt, i, env);
 			if (fmt[*i] == '}')
 				break;
 			assert(fmt[*i] == ' ' || fmt[*i] == '\t');
 			while (strchr(" \t", fmt[*i]))
 				++*i;
 		} else if (fmt[*i] == '/') {
-			assert(style == kFormatStyleNone);
 			++*i;
 
 			if (fmt[*i] == '0') {
@@ -238,7 +252,7 @@ static inline int format_warn_unused_result format_nonnull(1, 2, 3)
 				++*i;
 			} else {
 				while (strchr("bciu", fmt[*i])) {
-					style |= (fmt[*i] == 'b') * kFormatStyleBold |
+					style ^= (fmt[*i] == 'b') * kFormatStyleBold |
 					         (fmt[*i] == 'i') * kFormatStyleItalic |
 					         (fmt[*i] == 'u') * kFormatStyleUnderline |
 					         (fmt[*i] == 'c') * kFormatStyleCrossed;
@@ -256,8 +270,22 @@ static inline int format_warn_unused_result format_nonnull(1, 2, 3)
 			format_unreachable();
 		}
 	}
+	// If we need to disable a style, we have to reset the entire style + colors
+	if (output->style & ~style)
+	{
+		if (write_style(output, fg, bg, kFormatStyleReset))
+			return  -1;
+		output->style = kFormatStyleNone;
+		output->fg = (format_color)~0;
+		output->bg = (format_color)~0;
+	}
 
-	return write_style(output, fg, bg, style);
+	if (write_style(output, fg, bg, style))
+		return -1;
+	output->fg = fg;
+	output->bg = bg;
+	output->style = style == kFormatStyleReset ? kFormatStyleNone : style;
+	return 0;
 }
 
 int
@@ -287,7 +315,7 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 
 		/* Custom style */
 		if (fmt[i] == 'f' || fmt[i] == 'b' || fmt[i] == '/') {
-			if (fmt_style(output, fmt, &i))
+			if (fmt_style(output, fmt, &i, &env))
 				return -1;
 			assert(fmt[i] == '}');
 			++i;
