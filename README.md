@@ -129,6 +129,102 @@ format(&out, "{/b}bold{/b}\n{/i}italic{/i}\n{/u}underline{/u}\n{/c}crossed{/0}\n
 ```
 ![Text style showcase](./docs/style.png)
 
+**User defined types**
+
+You can format user defined types using the following:
+```c
+// return 0 on success, -1 on errors
+int format_my_type(struct format_output* output, /* where to write to */
+               const char* fmt_spec, /* format string, right after ':' */
+               const struct format_env* env, /* arguments passed to format */
+               size_t idx) /* index of the argument to format */
+{
+    // Your implementation ...
+    return 0;
+}
+```
+
+Then when calling the `format` macro, wrap your value like this: `format(out, "{}", (format_my_type, my_value))`.
+
+`format` exposes common parsers for commonly defined grammar elements: `alignment`, `number`, `size`, `specifier`.
+You should be using those to parse your custom format string.
+
+Here's an example custom formatter for a pair with width support:
+```c
+struct pair { int a; int b; };
+
+int format_pair(struct format_output* output,
+               const char* fmt_spec,
+               const struct format_env* env,
+               size_t idx)
+{
+	struct format_spec_placeholder fill; // fill character
+    char align = '<'; // alignment kind
+    size_t width = 0; // field width
+	
+	size_t i = 0;
+	if (fmt_spec[i] != '}')
+	{
+		format_parse_alignment(fmt_spec, &i, env, &align, &fill, " " /* default: fill using spaces */);
+		width = format_parse_size(fmt_spec, &i, env);
+	}
+	assert(fmt_spec[i] == '}');
+
+	// Get the pair
+	const struct pair *pair = (const struct pair*)env->args[idx].data;
+
+	// Compute the width it takes to format the pair
+	struct format_output width_output = format_output_none();
+	format(&width_output, "({}, {})", pair->a, pair->b);
+	const size_t fmt_width = width_output.size;
+
+
+	// Compute left/right alignment
+	size_t left = 0, right = 0;
+	switch (align) {
+		case '^':
+			left = (width > fmt_width ? width - fmt_width : 0);
+			right = left / 2;
+			left -= right;
+			break;
+		case '<':
+			right = width > fmt_width ? width - fmt_width : 0;
+			break;
+		case '>':
+			left = width > fmt_width ? width - fmt_width : 0;
+			break;
+	}
+
+	// Write left spacing
+	if (format_write_placeholder(output, &fill, left, 0))
+		return -1;
+	
+	// Write pair values
+	format(output, "({}, {})", pair->a, pair->b);
+
+	// Write Right spacing
+	if (format_write_placeholder(output, &fill, right, 1 /* to print in reverse */))
+		return -1;
+
+    return 0;
+}
+```
+
+You can use the formatter like this:
+```c
+struct pair p = {6, 7};
+
+format(&out, "{}\n", (format_pair, &p));
+// (6, 7)
+
+format(&out, "|{:>10}|\n", (format_pair, &p));
+// |    (6, 7)|
+format(&out, "|{:-^10}|\n", (format_pair, &p));
+
+format(&out, "|{:-^10}|\n", (format_pair, &p));
+// |--(6, 7)--|
+```
+
 
 ## Outputs
 
