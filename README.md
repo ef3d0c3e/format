@@ -14,7 +14,7 @@ These warnings can be ignored, but you might want so silence them globally.
 ## Setup
 
 To use `format` as a library to your project, I recommend the following setup:
- * Fetch the library from git; either as a submodule, or via a make/cmake rule
+ * Fetch the library using git; either as a submodule, or via a make/cmake rule
  * Compile the static `libformat.a`: `make -C libs/format`
  * Link your binary with `libformat.a` and add `-I./libs/format/include` to access the library header `format.h`
 
@@ -115,6 +115,19 @@ format(&out, "{:[3]#( ):{}}\n", FORMAT_ARRAY(arr));
 format(&out, "{:[{1}]:{}}\n", FORMAT_ARRAY(arr), sizeof(arr)/sizeof(arr[0]));
 // {2, 3, 5, 7, 11, 13}
 ```
+
+**Style & Colors**
+```c
+// Colors
+format(&out, "{fg#af2f2f bg#4fff4f}Hello{bg#4f4fff}World{/0}\n");
+```
+![Color showcase](./docs/colors.png)
+
+```
+// Style
+format(&out, "{/b}bold{/b}\n{/i}italic{/i}\n{/u}underline{/u}\n{/c}crossed{/0}\n");
+```
+![Text style showcase](./docs/style.png)
 
 
 ## Outputs
