@@ -208,6 +208,32 @@ Here are the possible alignment:
  * `format(out, "{:-^10}", "Hello") -> "---Hello--"`
  * `format(out, "{:{1}>10}", "Hello", "-_") -> "-_-_-Hello"`
 
+## Style & Colors
+
+Formatting for style and colors works differently than the rest of the format specifiers.
+
+The syntax goes like this:
+<p><b>color</b> := </b> ( <b>'fg'</b> | <b>'bg'</b> ) <b>'#'</b> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; (<br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; <b>3 or 6 hexadecimal digits</b> <em>parse number from hexadecimal</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; | <b>'{'</b> <a href="#number">number</a> <b>'}'</b> <em>color value, between 0 and 0xFFFFFF</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; )
+
+<p><b>style</b> := <b>'/'</b> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; (<br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; <b>'b'</b> <em>toggle bold</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; | <b>'i'</b> <em>toggle italic</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; | <b>'u'</b> <em>toggle underline</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; | <b>'c'</b> <em>toggle crossed</em> <br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; )+<br>
+ &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; | <b>'0'</b> <em>reset style and colors</em> <br>
+
+And the general syntax:
+<p><b>style_and_colors</b> := </b> ( <b>color</b> | <b>style</b> )+
+
+When you toggle a style, the other styles aren't impacted.
+Similarly, when you set the foreground color, the current background color doesn't change.
+
 ## Type Formatting
 
 ### String
