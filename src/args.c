@@ -282,8 +282,8 @@ static inline int format_warn_unused_result format_nonnull(1, 2, 3, 4)
 
 	if (write_style(output, fg, bg, style))
 		return -1;
-	output->fg = fg;
-	output->bg = bg;
+	output->fg = style == kFormatStyleReset ? (format_color)~0 : fg;
+	output->bg = style == kFormatStyleReset ? (format_color)~0 : bg;
 	output->style = style == kFormatStyleReset ? kFormatStyleNone : style;
 	return 0;
 }
