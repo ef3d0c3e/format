@@ -1,7 +1,7 @@
 NAME := format
 CC ?= cc
 AR ?= ar
-ARFLAGS := rcs
+ARFLAGS ?= rcs
 CFLAGS := -Wall -Wextra -Wconversion -pedantic -std=gnu23
 IFLAGS := -I./include
 LFLAGS :=

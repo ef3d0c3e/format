@@ -1,4 +1,7 @@
-![Tests badge](https://github.com/ef3d0c3e/format/actions/workflows/tests.yml/badge.svg)
+![x86_64 test badge](https://github.com/ef3d0c3e/format/actions/workflows/x86_64.yml/badge.svg)
+![i386 test badge](https://github.com/ef3d0c3e/format/actions/workflows/i386.yml/badge.svg)
+![arm64 test badge](https://github.com/ef3d0c3e/format/actions/workflows/arm64.yml/badge.svg)
+![arm32 test badge](https://github.com/ef3d0c3e/format/actions/workflows/arm32.yml/badge.svg)
 
 # Format
 
@@ -11,7 +14,7 @@ These warnings can be ignored, but you might want so silence them globally.
 
 # Usage
 
-See [Advanced usage](#advanced_usage) if you want more options.
+See [Advanced usage](#advanced-usage) if you want more options.
 
 ## Setup
 
@@ -453,7 +456,7 @@ Currently there are 2 experimental APIs: Object formatting, and Collection forma
 
 **Object formatting**
 
-Object formatting is 'functional' as of now, but formatting of sub-objects is still not up to standards. Mainly, it's missing automatic indentation, you have to specify manually how the 'depth' of sub-objects so they appear with the correct number of tabs.
+Object formatting is 'functional' as of now, but formatting of sub-objects is still not up to standards. Mainly, it's missing automatic indentation, you have to manually specify the 'depth' of sub-objects such that they appear with the correct number of tabs.
 While it's undocumented, you can read [tests/fmt_object.c](tests/fmt_object.c), on how the macro works.
 
 **Collection formatting**
