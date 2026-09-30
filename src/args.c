@@ -206,6 +206,7 @@ static inline format_color format_warn_unused_result format_nonnull(1)
 		if (!strchr("0123456789abcdef", tolower(fmt[*i])))
 		{
 			assert(k == 3 && "Invalid color, expected 3 or 6 hexadecimal digits");
+			/* #rgb shorthand: duplicate each digit, e.g. #abc -> #aabbcc */
 			color = (color & 0xF00) * 0x11 << 8
 				| (color & 0x0F0) * 0x11 << 4
 				| (color & 0x00F) * 0x11;
