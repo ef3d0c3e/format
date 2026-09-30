@@ -360,7 +360,7 @@ Similarly, when you set the foreground color, the current background color doesn
  * `format(out, "{:->5}", "a") -> "----a"`
  * `format(out, "{:5.2}", "Hello") -> "He   "`
  * `format(out, "{:?}", "\nT\x87") -> "\nT\x87"`
- * `format(out, "{:x}", "\nT\x87") -> "0x0AT0x87"`
+ * `format(out, "{:x}", "\nT\x87") -> "0x0aT0x87"`
 
 ### Char
 

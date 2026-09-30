@@ -1407,7 +1407,7 @@ format__collection_iterator_array(const struct format_arg_collection* collection
  *  - `format(out, "{:.2}", "Hello") -> "He"`
  *  - `format(out, "{:5.2}", "Hello") -> "He   "`
  *  - `format(out, "{:?}", "\nT\x87") -> "\nT\x87"`
- *  - `format(out, "{:x}", "\nT\x87") -> "0x0AT0x87"`
+ *  - `format(out, "{:x}", "\nT\x87") -> "0x0aT0x87"`
  *
  *
  * @anchor grammar_format_signed
