@@ -229,7 +229,7 @@ do { \
 #define for_each__(id_, type_, varname_, ...) \
 	type_ CONCAT(foreach_array_, id_)[] = {__VA_ARGS__}; \
 	type_ varname_ = CONCAT(foreach_array_, id_)[0]; \
-	for (size_t idx_ = 0; idx_ < sizeof(CONCAT(foreach_array_, id_)) / sizeof(type_) && (varname_ = CONCAT(foreach_array_, id_)[idx_], 1); varname_ = CONCAT(foreach_array_, id_)[idx_++])
+	for (size_t idx_ = 0; idx_ < sizeof(CONCAT(foreach_array_, id_)) / sizeof(type_) && (varname_ = CONCAT(foreach_array_, id_)[idx_], 1); ++idx_)
 #define for_each_(id_, type_, varname_, ...) for_each__(id_, type_, varname_, __VA_ARGS__)
 #define for_each(type_, varname_, ...) FORMAT__START_DIAG(clang) FORMAT__DIAG(clang, ignored "-Wc2y-extensions") for_each_(__COUNTER__, type_, varname_, __VA_ARGS__) FORMAT__END_DIAG(clang)
 
