@@ -237,7 +237,7 @@ struct format_arg
 		struct format_arg_collection collection;
 	} payload;
 	/** @brief Raw data, value to format */
-	uintptr_t data;
+	uint64_t data;
 };
 
 /** @} */
@@ -1016,13 +1016,13 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 	assert(format_arg__.payload.collection.next != NULL);                                                \
 	assert(format_arg__.payload.collection.width != NULL);                                               \
 	assert(format_arg__.payload.collection.formatter != NULL);                                           \
-	format_arg__.data = (uintptr_t)(FIELD);
+	format_arg__.data = (uint64_t)(uintptr_t)(FIELD);
 #define FORMAT__FORMATTER_TRIPLET_SUBOBJECT(FORMATTER, FIELD)                                    \
 	typeof(FIELD)* format_arg_triplet__ = (&FIELD);                                              \
 	(void)format_arg_triplet__;                                                                  \
 	format_arg__.type = kFormatScalar;                                                           \
 	format_arg__.payload.formatter = (FORMATTER);                                                        \
-	format_arg__.data = (uintptr_t)(&FIELD);
+	format_arg__.data = (uint64_t)(uintptr_t)(&FIELD);
 #define FORMAT__FORMATTER_TRIPLET(TAG, X, Y) FORMAT__CAT(FORMAT__FORMATTER_TRIPLET_, TAG)(X, Y)
 
 #define FORMAT__MAPPER_VALUE(ARG)                                                                \
@@ -1047,12 +1047,12 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))()(                                              \
 		  format_arg__.data = __builtin_choose_expr(                                             \
 		    FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)),                                 \
-		    __extension__({ (uintptr_t)(FORMAT__MAPPER_VALUE(ARG)); }),                          \
+		    __extension__({ (uint64_t)(uintptr_t)(FORMAT__MAPPER_VALUE(ARG)); }),                          \
 		    __extension__({                                                                      \
 			    const typeof(FORMAT__MAPPER_VALUE(ARG)) format_temp__ =                          \
 			      FORMAT__MAPPER_VALUE(ARG);                                                     \
 			    typeof(format_arg__.data) format_result__ = 0;                                   \
-			    FORMAT__STATIC_ASSERT(sizeof(typeof(format_arg__.data)) <= sizeof(uintptr_t));   \
+			    FORMAT__STATIC_ASSERT(sizeof(typeof(format_arg__.data)) <= sizeof(uint64_t));   \
 			    memcpy(&format_result__, &format_temp__, sizeof(format_temp__));                 \
 			    format_result__;                                                                 \
 		    })));                                                                                \
@@ -1136,10 +1136,10 @@ format__collection_array_width(struct format_arg_collection* collection,
 		const void* val = c.cur;
 
 		if (collection->is_pointer)
-			arg.data = *(uintptr_t*)val;
+			arg.data = (uint64_t)*(uintptr_t*)val;
 		else {
 			arg.data = 0;
-			assert(collection->elem_size <= sizeof(uintptr_t));
+			assert(collection->elem_size <= sizeof(uint64_t));
 			memcpy(&arg.data, val, collection->elem_size);
 		}
 		collection->formatter(&out, fmt, &env, 0);

@@ -1,0 +1,63 @@
+name: Tests (i386)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Test i386 (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - gcc
+          - clang
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/386
+
+      - name: Install dependencies and test (i386 container)
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          docker run --rm \
+            --platform linux/386 \
+            -e CC \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            debian:sid \
+            linux32 bash -euxo pipefail -c '
+              apt-get update
+              apt-get install -y \
+                ca-certificates \
+                git \
+                make \
+                gcc \
+                clang \
+                meson \
+                ninja-build \
+                cmake \
+                pkg-config \
+                libcriterion-dev \
+                libgpg-error-dev \
+                libzstd-dev
+
+              git config --global --add safe.directory /work
+
+              uname -m
+              dpkg --print-architecture
+              $CC --version
+
+              make test
+            '

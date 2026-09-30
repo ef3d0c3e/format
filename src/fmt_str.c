@@ -109,7 +109,7 @@ format_fmt_str(struct format_output* output,
 	struct string_spec spec = parse_string_spec(fmt_spec, env);
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
-	const char* val = (const char*)env->args[idx].data;
+	const char* val = (const char*)(uintptr_t)env->args[idx].data;
 	assert(val != NULL && "Cannot format a NULL string");
 
 	/* Number of bytes to display */

@@ -175,9 +175,12 @@ format_fmt_collection(struct format_output* output,
 		const void* val = collection->next(collection);
 
 		if (collection->is_pointer)
-			args[0].data = *(uintptr_t*)val;
+			args[0].data = (uint64_t)*(uintptr_t*)val;
 		else
+		{
+			args[0].data = 0;
 			memcpy(&args[0].data, val, collection->elem_size);
+		}
 		collection->formatter(output, spec.subexpr, &subenv, 0);
 	}
 	/* Right delim */

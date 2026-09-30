@@ -1,6 +1,5 @@
 build/
 .cache
-fmt
-libfmt.a
+libformat.a
 compile_commands.json
 docs/html
