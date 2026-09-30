@@ -72,7 +72,10 @@ parse_number_spec(const char* fmt_spec, const struct format_env* env)
 		.left = fmt_spec,
 	};
 	if (*fmt_spec == '}')
+	{
+		spec.align = '<';
 		return spec;
+	}
 
 	size_t i = 0;
 	/* Parse align */

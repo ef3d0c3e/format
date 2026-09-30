@@ -101,23 +101,23 @@ static inline int format_warn_unused_result format_nonnull(1)
 		buf[i++] = '2';
 		buf[i++] = ';';
 		const uint8_t r = (fg >> 16) & 0xFF;
-		if (r > 100)
+		if (r >= 100)
 			buf[i++] = (char)('0' + (r / 100));
-		if (r > 10)
+		if (r >= 10)
 			buf[i++] = (char)('0' + ((r / 10) % 10));
 		buf[i++] = (char)('0' + (r % 10));
 		buf[i++] = ';';
 		const uint8_t g = (fg >> 8) & 0xFF;
-		if (g > 100)
+		if (g >= 100)
 			buf[i++] = (char)('0' + (g / 100));
-		if (g > 10)
+		if (g >= 10)
 			buf[i++] = (char)('0' + ((g / 10) % 10));
 		buf[i++] = (char)('0' + (g % 10));
 		buf[i++] = ';';
 		const uint8_t b = fg & 0xFF;
-		if (b > 100)
+		if (b >= 100)
 			buf[i++] = (char)('0' + (b / 100));
-		if (b > 10)
+		if (b >= 10)
 			buf[i++] = (char)('0' + ((b / 10) % 10));
 		buf[i++] = (char)('0' + (b % 10));
 		buf[i++] = 'm';
@@ -131,23 +131,23 @@ static inline int format_warn_unused_result format_nonnull(1)
 		buf[i++] = '2';
 		buf[i++] = ';';
 		const uint8_t r = (bg >> 16) & 0xFF;
-		if (r > 100)
+		if (r >= 100)
 			buf[i++] = (char)('0' + (r / 100));
-		if (r > 10)
+		if (r >= 10)
 			buf[i++] = (char)('0' + ((r / 10) % 10));
 		buf[i++] = (char)('0' + (r % 10));
 		buf[i++] = ';';
 		const uint8_t g = (bg >> 8) & 0xFF;
-		if (g > 100)
+		if (g >= 100)
 			buf[i++] = (char)('0' + (g / 100));
-		if (g > 10)
+		if (g >= 10)
 			buf[i++] = (char)('0' + ((g / 10) % 10));
 		buf[i++] = (char)('0' + (g % 10));
 		buf[i++] = ';';
 		const uint8_t b = bg & 0xFF;
-		if (b > 100)
+		if (b >= 100)
 			buf[i++] = (char)('0' + (b / 100));
-		if (b > 10)
+		if (b >= 10)
 			buf[i++] = (char)('0' + ((b / 10) % 10));
 		buf[i++] = (char)('0' + (b % 10));
 		buf[i++] = 'm';
@@ -206,9 +206,9 @@ static inline format_color format_warn_unused_result format_nonnull(1)
 		if (!strchr("0123456789abcdef", tolower(fmt[*i])))
 		{
 			assert(k == 3 && "Invalid color, expected 3 or 6 hexadecimal digits");
-			color = (color & 0xF00) << 12
-				| (color & 0x0F0) << 8
-				| (color & 0x00F) << 4;
+			color = (color & 0xF00) * 0x11 << 8
+				| (color & 0x0F0) * 0x11 << 4
+				| (color & 0x00F) * 0x11;
 			break;
 		}
 
@@ -291,7 +291,6 @@ static inline int format_warn_unused_result format_nonnull(1, 2, 3, 4)
 int
 format_args(struct format_output* output, const char* fmt, const struct format_env env)
 {
-	// TODO: Err handling
 	size_t cur_positional = 0;
 	for (size_t i = 0; fmt[i];) {
 		size_t start, end;
@@ -344,7 +343,8 @@ format_args(struct format_output* output, const char* fmt, const struct format_e
 		/* Call formatter */
 		if (env.args[index].type == kFormatScalar) {
 			assert(env.args[index].payload.formatter != NULL);
-			env.args[index].payload.formatter(output, sep, &env, index);
+			if (env.args[index].payload.formatter(output, sep, &env, index))
+				return -1;
 		} else if (env.args[index].type == kFormatCollection) {
 			if (format_fmt_collection(output, sep, &env, index))
 				return -1;

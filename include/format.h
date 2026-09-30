@@ -285,6 +285,15 @@ struct format_output
 	size_t size;
 	/** @brief Buffer allocated capacity */
 	size_t capacity;
+	/**
+	 * @brief Total number of bytes written
+	 *
+	 * Use this variable to keep track of how many bytes were written to the output. This
+	 * corresponds to the total accumulated length of buffers passed to @ref format_output_write,
+	 * which may not exactly be the number of bytes written to the underlying output, due to
+	 * buffering.
+	 */
+	size_t nwritten;
 
 	// Allocators
 	void* (*malloc)(size_t);
@@ -345,6 +354,8 @@ format_output_set_allocator(struct format_output* output,
                             void* (*realloc)(void*, size_t, size_t)) format_nonnull(1, 2, 3, 4);
 /**
  * @brief Set the output flushing mode
+ *
+ * This is only valid if the output outputs to a file descriptor. Otherwise an assert fires.
  */
 void
 format_output_set_flush(struct format_output* output, enum format_output_flush_mode mode)
@@ -1149,7 +1160,7 @@ format__collection_array_width(struct format_arg_collection* collection,
 		c.cur = (char*)c.cur + collection->elem_size;
 	}
 
-	return out.size;
+	return out.nwritten;
 }
 
 #define FORMAT__ARRAY_0(ARRAY)                                                                   \
@@ -1269,11 +1280,11 @@ format__collection_array_width(struct format_arg_collection* collection,
 	                         ))(                                                                 \
 	  FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(FORMAT__SELECT(0, ARG)))(                               \
 	    FORMAT__OBJ_MAPPER_T(N,                                                                  \
-		                     CONST,                                                              \
-		                     ARG,                                                                \
-		                     FORMAT__SELECT(0, 0, ARG),                                          \
-		                     FORMAT__SELECT(0, 1, ARG),                                          \
-		                     FORMAT__SELECT(0, 2, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, ARG)))
+	                         CONST,                                                              \
+	                         ARG,                                                                \
+	                         FORMAT__SELECT(0, 0, ARG),                                          \
+	                         FORMAT__SELECT(0, 1, ARG),                                          \
+	                         FORMAT__SELECT(0, 2, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, ARG)))
 
 #define FORMAT_OBJ(TYPE, FUN, ...)                                                               \
 	int format_warn_unused_result format_nonnull(1, 2, 3) FUN(struct format_output* output,      \

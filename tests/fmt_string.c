@@ -128,3 +128,59 @@ Test(fmt_string, fill) {
 	test_manual("|{:{1}>20}|", "| 🎅 🎅 🎅 🎅 🎅 🎅 🎅 hello|", "hello", " 🎅");
 	test_manual("|{:{1}>20}|", "| 🎅 🎅 🎅 🎅 🎅 🎅 🎅hello2|", "hello2", " 🎅");
 }
+
+Test(fmt_string, escape) {
+	test_manual("{:?}", "\\nT\\x87", "\nT\x87");
+	test_manual("{:x}", "0x0aT0x87", "\nT\x87");
+
+	for (size_t i = 1; i < 255; ++i)
+	{
+		const char c = (char)i;
+		const char *str = (const char[2]){c, 0};
+
+		char buf[256];
+		
+		sprintf(buf, "%c", c);
+		test_manual("{}", buf, str);
+
+		if (isprint(c) || c == '\t')
+			sprintf(buf, "%c", c);
+		else
+			sprintf(buf, "0x%02hhx", c);
+		test_manual("{:x}", buf, str);
+
+		if (isprint(c) || c == '\t')
+			sprintf(buf, "%c", c);
+		else if (strchr("\n\r\v\f\a\b", c))
+		{
+			char escape = 0;
+			switch (c)
+			{
+				case '\a':
+					escape = 'a';
+					break;
+				case '\b':
+					escape = 'b';
+					break;
+				case '\n':
+					escape = 'n';
+					break;
+				case '\v':
+					escape = 'v';
+					break;
+				case '\f':
+					escape = 'f';
+					break;
+				case '\r':
+					escape = 'r';
+					break;
+				default:
+					break;
+			}
+			sprintf(buf, "\\%c", escape);
+		}
+		else
+			sprintf(buf, "\\x%02hhx", c);
+		test_manual("{:?}", buf, str);
+	}
+}

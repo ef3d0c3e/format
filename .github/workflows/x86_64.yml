@@ -60,4 +60,4 @@ jobs:
       - name: Test
         env:
           CC: ${{ matrix.compiler }}
-        run: make test
+        run: make test EXTRA_CFLAGS='-fsanitize=address,undefined'

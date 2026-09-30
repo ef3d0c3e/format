@@ -67,4 +67,4 @@ jobs:
         run: docker exec build linux32 sh -c '$CC --version'
 
       - name: Test
-        run: docker exec build linux32 make test
+        run: docker exec build linux32 make test EXTRA_CFLAGS='-fsanitize=address,undefined'

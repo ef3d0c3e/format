@@ -80,4 +80,4 @@ jobs:
         run: docker exec build sh -c '$CC --version'
 
       - name: Test
-        run: docker exec build make test
+        run: docker exec build make test EXTRA_CFLAGS='-fsanitize=address,undefined'

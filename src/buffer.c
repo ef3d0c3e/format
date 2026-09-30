@@ -31,6 +31,7 @@ format_output_fd(int fd)
 		.data = NULL,
 		.size = 0,
 		.capacity = 0,
+		.nwritten = 0,
 		.malloc = NULL,
 		.free = NULL,
 		.realloc = NULL,
@@ -51,6 +52,7 @@ format_output_file(FILE* file)
 		.data = NULL,
 		.size = 0,
 		.capacity = 0,
+		.nwritten = 0,
 		.malloc = NULL,
 		.free = NULL,
 		.realloc = NULL,
@@ -70,6 +72,7 @@ format_output_buf(void)
 		.data = NULL,
 		.size = 0,
 		.capacity = 0,
+		.nwritten = 0,
 		.malloc = NULL,
 		.free = NULL,
 		.realloc = NULL,
@@ -89,6 +92,7 @@ format_output_none(void)
 		.data = NULL,
 		.size = 0,
 		.capacity = (size_t)-1,
+		.nwritten = 0,
 		.malloc = NULL,
 		.free = NULL,
 		.realloc = NULL,
@@ -133,11 +137,14 @@ void
 format_output_set_flush(struct format_output* output, enum format_output_flush_mode mode)
 {
 	assert(output != NULL);
-	assert((output->fd != -1 || output->file != NULL) && "Invalid output type");
+	if (output->fd == -1)
+		return;
 
-	format_output_flush(output);
-	output->flush_mode = mode;
-	// TODO: stdio
+	assert(mode != kFormatFlushNever_ && "Incompatible flush mode");
+	if (output->fd != -1 && mode != kFormatFlushNever_) {
+		format_output_flush(output);
+		output->flush_mode = mode;
+	}
 }
 
 int
@@ -174,10 +181,12 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 	if (output->fd != -1) {
 		assert(output->file == NULL);
 		assert(output->flush_mode != kFormatFlushNever_);
+
+		/* No buffering */
 		if (output->flush_mode == kFormatFlushAlways) {
 			size_t pos = 0;
 			do {
-				ssize_t n = write(output->fd, buf + pos, len - pos);
+				const ssize_t n = write(output->fd, buf + pos, len - pos);
 				if (n < 0 && errno == EINTR)
 					continue;
 				else if (n < 0) {
@@ -185,6 +194,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 					break;
 				} else if (n == 0)
 					continue;
+				output->nwritten += (size_t)n;
 				pos += (size_t)n;
 			} while (pos < len);
 			return 0;
@@ -203,56 +213,62 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 		assert(output->data != NULL);
 
 		size_t pos = 0;
-		/* Write and flush all blocks until the last block */
-		if (output->size + len > output->capacity) {
-			/* Write and flush until last block */
-			while (1) {
-				if (output->size + len - pos <= output->capacity)
-					break;
-				assert(pos <= len);
-				const size_t avail = output->capacity - output->size;
-				assert(avail <= len - pos);
-				memcpy(output->data, buf + pos, avail);
-				if (format_output_flush(output) == -1)
+		if (output->flush_mode == kFormatFlushNewline) {
+			/* Here we know that the internal buffer cannot contain a `\n`, so we scan the @p buf
+			 * for a `\n`, then we write everything until that `\n`, and the rest is handled by
+			 * the normal buffer case. */
+
+			const void* nl = memrchr(buf, '\n', len);
+			// Write until newline
+			if (nl) {
+				const size_t nl_pos = (size_t)((const char*)nl - buf);
+				// Write internal buffer first
+				if (format_output_flush(output))
 					return -1;
-				pos += avail;
+
+				// Write until the last newline
+				while (pos != nl_pos) {
+					assert(pos < nl_pos);
+					const ssize_t n = write(output->fd, buf + pos, nl_pos - pos);
+					if (n < 0 && errno == EINTR) {
+						continue;
+					} else if (n < 0) {
+						return -1;
+					}
+					if (n == 0) {
+						continue;
+					}
+					output->nwritten += (size_t)n;
+					pos += (size_t)n;
+				}
 			}
-			assert(output->size == 0);
+			assert(len >= pos);
+		}
+		const size_t left = len - pos;
+		/* If leftover is small, copy it to buffer, otherwise write it instantly */
+		if (left <= output->capacity - output->size) {
+			memcpy(output->data + output->size, buf + pos, left);
+			output->size += left;
+			output->nwritten += left;
+			return 0;
 		}
 
-		assert(pos <= len && len - pos < output->capacity);
-		/* Write last block, optionally flush */
-		if (output->flush_mode == kFormatFlushNewline) {
-			const void* nl = memrchr(buf + pos, '\n', len - pos);
-
-			if (nl) {
-				const size_t flush_point = (uintptr_t)nl - (uintptr_t)(buf + pos) + 1;
-				/* Write until after last `\n` (flush_point), flush, then write leftover */
-				memcpy(output->data + output->size,
-				       buf + pos,
-				       flush_point);
-				output->size += flush_point;
-				pos += flush_point;
-				/* Flush so all complete lines appear */
-				if (format_output_flush(output) == -1)
-					return -1;
-				/* Copy leftover */
-				memcpy(output->data, buf + pos, len - pos);
-				output->size = len - pos;
-				pos = len;
-			} else {
-				/* Write everything */
-				assert(output->size + len - pos <= output->capacity);
-				memcpy(output->data + output->size, buf + pos, len - pos);
-				output->size += len - pos;
-				pos = len;
+		/* Otherwise, flush buffer, and write whatever is left directly, without buffering */
+		if (format_output_flush(output))
+			return -1;
+		while (pos != len) {
+			assert(pos < len);
+			const ssize_t n = write(output->fd, buf + pos, len - pos);
+			if (n < 0 && errno == EINTR) {
+				continue;
+			} else if (n < 0) {
+				return -1;
 			}
-		} else {
-			/* Write last block */
-			assert(output->flush_mode == kFormatFlushNone);
-			memcpy(output->data, buf + pos, pos - len);
-			output->size = pos - len;
-			pos = len;
+			if (n == 0) {
+				continue;
+			}
+			output->nwritten += (size_t)n;
+			pos += (size_t)n;
 		}
 		assert(pos == len);
 	}
@@ -268,6 +284,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 					return -1;
 			}
 			pos += n;
+			output->nwritten += n;
 		}
 		assert(pos == len);
 	}
@@ -275,8 +292,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 	else {
 		assert(output->file == NULL && output->fd == -1);
 
-		if (output->capacity != (size_t)-1)
-		{
+		if (output->capacity != (size_t)-1) {
 
 			/* Compute new capacity */
 			size_t new_cap = output->capacity ? output->capacity : 1;
@@ -299,6 +315,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 
 			/* Copy */
 			memcpy(output->data + output->size, buf, len);
+			output->nwritten += len;
 		}
 		output->size += len;
 	}

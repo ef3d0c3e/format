@@ -168,15 +168,22 @@ format_fmt_str(struct format_output* output,
 	char buf[16];
 	for (size_t i = 0; i < len;) {
 		const size_t cp = format_utf8_len(val + i, len - i);
-		if (cp == 0) {
-			/* Write as-is */
-			if (format_output_write(output, val + i, 1))
-				return -1;
-		} else if (cp == 1) {
+		if (spec.type == 's') /* Write as-is */ {
+
+			if (cp == 0) {
+				if (format_output_write(output, val + i, 1))
+					return -1;
+			} else {
+				if (format_output_write(output, val + i, cp))
+					return -1;
+			}
+		} else /* Escape */ {
+			/* Printable */
 			if (isprint(val[i]) || val[i] == '\t') {
 				if (format_output_write(output, val + i, 1))
 					return -1;
-			} else if (val[i] != 0 && strchr("\a\b\n\v\f\r", val[i]) && spec.type == '?') {
+			} else if (spec.type == '?' && val[i] != 0 &&
+			           strchr("\a\b\n\v\f\r", val[i])) /* Standard escape codes */ {
 				buf[0] = '\\';
 				switch (val[i]) {
 					case '\a':
@@ -203,34 +210,13 @@ format_fmt_str(struct format_output* output,
 				if (format_output_write(output, buf, 2))
 					return -1;
 			} else {
-				switch (spec.type) {
-					case 's':
-						if (format_output_write(output, val + i, 1))
-							return -1;
-						break;
-					case '?':
-						buf[0] = '\\';
-						buf[1] = 'x';
-						buf[2] = FORMAT_HEX[(unsigned char)val[i] / 16];
-						buf[3] = FORMAT_HEX[(unsigned char)val[i] % 16];
-						if (format_output_write(output, buf, 4))
-							return -1;
-						break;
-					case 'x':
-						buf[0] = '0';
-						buf[1] = 'x';
-						buf[2] = FORMAT_HEX[(unsigned char)val[i] / 16];
-						buf[3] = FORMAT_HEX[(unsigned char)val[i] % 16];
-						if (format_output_write(output, buf, 4))
-							return -1;
-						break;
-					default:
-						format_unreachable();
-				}
+				buf[0] = spec.type == 'x' ? '0' : '\\';
+				buf[1] = 'x';
+				buf[2] = FORMAT_HEX[(unsigned char)val[i] / 16];
+				buf[3] = FORMAT_HEX[(unsigned char)val[i] % 16];
+				if (format_output_write(output, buf, 4))
+					return -1;
 			}
-		} else if (cp > 1) {
-			if (format_output_write(output, val + i, cp))
-				return -1;
 		}
 		i += cp ? cp : 1;
 	}
