@@ -32,8 +32,8 @@ Test(fmt_style, colors)
 	test_manual("{bg#fff}", "\033[48;2;255;255;255m");
 
 	/* Color from argument */
-	test_manual("{fg{1}}", "\033[38;2;18;52;86m", 0x123456);
-	test_manual("{bg{1}}", "\033[48;2;255;255;255m", 0xFFFFFF);
+	test_manual("{fg#{0}}", "\033[38;2;18;52;86m", 0x123456);
+	test_manual("{bg#{0}}", "\033[48;2;255;255;255m", 0xFFFFFF);
 
 	/* Same color is not emitted twice in a row */
 	test_manual("{fg#ff0000}{fg#ff0000}", "\033[38;2;255;0;0m");
@@ -77,11 +77,10 @@ Test(fmt_style, bad_color_extra_digits, .signal = SIGABRT)
 
 Test(fmt_style, bad_style, .signal = SIGABRT)
 {
-	test_manual("{xx}", "");
+	test_manual("{fg}", "");
 }
 
 Test(fmt_style, bad_color_value, .signal = SIGABRT)
 {
-	test_manual("{fg{1}}", "", 0x1000000);
+	test_manual("{fg#{0}}", "", 0x1000000);
 }
->>>>>>> f7314f5 (test: cover style and colors)
