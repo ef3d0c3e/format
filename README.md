@@ -11,6 +11,8 @@ These warnings can be ignored, but you might want so silence them globally.
 
 # Usage
 
+See [Advanced usage](#advanced_usage) if you want more options.
+
 ## Setup
 
 To use `format` as a library to your project, I recommend the following setup:
@@ -22,7 +24,7 @@ To use `format` as a library to your project, I recommend the following setup:
 # Add as git submodule, you might want to pin to a release version
 git submodule add https://github.com/ef3d0c3e/format libs/format
 ```
-Add this to your makefile:
+Add this to your Makefile:
 ```make
 # Static libformat.a location
 LIBFORMAT_A := ./libs/format/libformat.a
@@ -435,13 +437,38 @@ Most common unsigned integer types can be formatted: `unsigned char, unsigned sh
 Unsigned integers are formatted similarly to Signed Integers, except they don't have the *sign* specifier.
 See [Signed Integers](#signed_integers) for reference.
 
+# Advanced usage
+
+The library is compiled with `-Wall -Wextra -Wconversion -pedantic -std=gnu23`.
+By default it builds using this additional flag: `-ggdb`. This is controlled by `EXTRA_CFLAGS`, which you can set when calling `make -C` from your own Makefile:
+```make
+$(LIBFORMAT_A):
+	@echo "Building libformat..."
+	$(MAKE) EXTRA_CFLAGS='-O2' -C $(dir $(LIBFORMAT_A))
+```
+
+## Experimental APIs
+
+Currently there are 2 experimental APIs: Object formatting, and Collection formatting.
+
+**Object formatting**
+
+Object formatting is 'functional' as of now, but formatting of sub-objects is still not up to standards. Mainly, it's missing automatic indentation, you have to specify manually how the 'depth' of sub-objects so they appear with the correct number of tabs.
+While it's undocumented, you can read [tests/fmt_object.c](tests/fmt_object.c), on how the macro works.
+
+**Collection formatting**
+
+This API is partially exposed via the `FORMAT_ARRAY` macro.
+While the `FORMAT_ARRAY` is functional, the underlying API needs a complete overhaul. In particular I want to ditch the `void*` generics, in favor of macro-based monomorphization. So I'd recommend against implement any custom collection formatter for now.
+
+
 # Q&A
 
 **Q:** Which compilers and C versions are supported?
 
 **A:** Currently, `clang` and `gcc` are supported. You need at least `C99`, but the recommended version is `C23`. `C99` compiles fine, but some features are disabled (mainly better static assertions), and `clang` complains about some features not being standard `C99`, but being supported by `GNUC`.
 
-**Q:** How are errors handler?
+**Q:** How are errors handled?
 
 **A:**
  1. An error that happens when writing to the underlying output is reported by `format`.
