@@ -129,6 +129,25 @@ Test(fmt_flush, buffered_overflow)
 	close(fd);
 }
 
+Test(fmt_flush, memory_noop)
+{
+	/* Setting the flush mode on memory outputs has no effect */
+	struct format_output out = format_output_buf();
+	format_output_set_flush(&out, kFormatFlushAlways);
+	const int result_buf = format(&out, "hello");
+	cr_assert_eq(result_buf, 0);
+	cr_assert_eq(out.size, 5);
+	cr_assert(memcmp(out.data, "hello", 5) == 0);
+	format_output_destroy(&out);
+
+	struct format_output none = format_output_none();
+	format_output_set_flush(&none, kFormatFlushNone);
+	const int result_none = format(&none, "hello");
+	cr_assert_eq(result_none, 0);
+	cr_assert_eq(none.size, 5);
+	format_output_destroy(&none);
+}
+
 static int g_eintr_read_fd;
 static size_t g_eintr_drain;
 
