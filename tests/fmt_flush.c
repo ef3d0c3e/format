@@ -157,13 +157,17 @@ Test(fmt_flush, eintr)
 	cr_assert(fcntl(fds[1], F_SETFL, flags | O_NONBLOCK) != -1);
 	char fill[4096];
 	memset(fill, 'x', sizeof(fill));
-	while (write(fds[1], fill, sizeof(fill)) > 0)
-		;
+	size_t filled = 0;
+	ssize_t n;
+	while ((n = write(fds[1], fill, sizeof(fill))) > 0)
+		filled += (size_t)n;
 	cr_assert(errno == EAGAIN || errno == EWOULDBLOCK);
 	cr_assert(fcntl(fds[1], F_SETFL, flags) != -1);
 
 	g_eintr_read_fd = fds[0];
-	g_eintr_drain = 3;
+	/* Drain whole pages: pipe writes are accounted per buffer slot, so
+	 * freeing a few bytes is not enough to unblock the writer */
+	g_eintr_drain = 8192;
 
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
@@ -181,24 +185,26 @@ Test(fmt_flush, eintr)
 	ualarm(0, 0);
 
 	format_output_destroy(&out);
+	/* Close the write end so the drain loop below sees EOF */
+	close(fds[1]);
 
-	/* The pipe should still be full: 3 bytes were drained by the signal
-	 * handler, and the interrupted flush must have written its 3 bytes */
+	/* The interrupted flush must have written its 3 bytes after the signal
+	 * handler freed some room in the pipe */
 	size_t total = 0;
 	size_t last_pos = 0;
 	char last[3] = {0};
 	char buf[4096];
 	for (;;) {
-		const ssize_t n = read(fds[0], buf, sizeof(buf));
-		if (n <= 0)
+		const ssize_t r = read(fds[0], buf, sizeof(buf));
+		if (r <= 0)
 			break;
-		for (ssize_t k = 0; k < n; ++k) {
+		for (ssize_t k = 0; k < r; ++k) {
 			last[last_pos] = buf[k];
 			last_pos = (last_pos + 1) % sizeof(last);
 		}
-		total += (size_t)n;
+		total += (size_t)r;
 	}
-	cr_assert_eq(total, 65536);
+	cr_assert_eq(total, filled - 8192 + 3);
 	char ordered[3];
 	for (size_t k = 0; k < sizeof(ordered); ++k)
 		ordered[k] = last[(last_pos + k) % sizeof(last)];
