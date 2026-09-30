@@ -157,10 +157,10 @@ format_output_flush(struct format_output* output)
 		while (total != output->size) {
 			const ssize_t n = write(output->fd, output->data + total, output->size - total);
 			if (n == -1) {
-				if (errno != EINTR) {
-					output->size = 0;
-					return -1;
-				}
+				if (errno == EINTR)
+					continue;
+				output->size = 0;
+				return -1;
 			}
 			total += (size_t)n;
 		}
