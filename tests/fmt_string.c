@@ -100,6 +100,60 @@ Test(fmt_string, quotes) {
 #undef test
 }
 
+Test(fmt_string, display) {
+	test_manual("{}", "Hello", "Hello");
+	test_manual("{:s}", "Hello", "Hello");
+	test_manual("{:?}", "Hello", "Hello");
+	test_manual("{:x}", "Hello", "Hello");
+
+	/* \t is always printed as-is */
+	test_manual("{:s}", "\n\t\r", "\n\t\r");
+	test_manual("{:?}", "\\n\t\\r", "\n\t\r");
+	test_manual("{:x}", "0x0A\t0x0D", "\n\t\r");
+
+	/* All escapable characters */
+	test_manual("{:?}", "\\a\\b\\n\\v\\f\\r", "\a\b\n\v\f\r");
+	test_manual("{:x}", "0x070x080x0A0x0B0x0C0x0D", "\a\b\n\v\f\r");
+
+	/* Other non-printables */
+	test_manual("{:s}", "\x01\x87", "\x01\x87");
+	test_manual("{:?}", "\\x01\\x87", "\x01\x87");
+	test_manual("{:x}", "0x010x87", "\x01\x87");
+
+	/* Invalid UTF-8 is escaped like any other non-printable byte */
+	test_manual("{:?}", "\\nT\\x87", "\nT\x87");
+	test_manual("{:x}", "0x0AT0x87", "\nT\x87");
+
+	/* Display types with quotes */
+	test_manual("{:#''?}", "'\\n'", "\n");
+	test_manual("{:#''x}", "'0x0A'", "\n");
+}
+
+Test(fmt_string, utf8) {
+	/* Multi-byte code points count as one column */
+	test_manual("|{:5}|", "|🎅    |", "🎅");
+	test_manual("|{:<5}|", "|🎅    |", "🎅");
+	test_manual("|{:>5}|", "|    🎅|", "🎅");
+	test_manual("|{:^5}|", "|  🎅  |", "🎅");
+	test_manual("|{:5}|", "|é🎅   |", "é🎅");
+	test_manual("{:?}", "🎅", "🎅");
+	test_manual("{:x}", "🎅", "🎅");
+}
+
+Test(fmt_string, precision_utf8) {
+	/* Precision is in bytes and may split a code point */
+	test_manual("{:.1}", "\xF0", "🎅");
+	test_manual("{:.2}", "\xF0\x9F", "🎅");
+	test_manual("{:.3}", "\xF0\x9F\x8E", "🎅");
+	test_manual("{:.4}", "🎅", "🎅");
+	test_manual("{:.1}", "\xC3", "é");
+	test_manual("{:.2}", "é", "é");
+
+	/* Truncated sequences are escaped when a display type asks for it */
+	test_manual("{:.1?}", "\\xF0", "🎅");
+	test_manual("{:.1x}", "0xF0", "🎅");
+}
+
 Test(fmt_string, fill) {
 	test_manual("|{:{1}<20}|", "|hello. . . . . . . .|", "hello", " .");
 	test_manual("|{:{1}<20}|", "|hello2 . . . . . . .|", "hello2", " .");
