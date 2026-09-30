@@ -137,11 +137,11 @@ void
 format_output_set_flush(struct format_output* output, enum format_output_flush_mode mode)
 {
 	assert(output != NULL);
-	if (output->fd == -1)
+	/* Memory outputs do not flush, setting the mode has no effect */
+	if (output->fd == -1 && output->file == NULL)
 		return;
 
-	assert(mode != kFormatFlushNever_ && "Incompatible flush mode");
-	if (output->fd != -1 && mode != kFormatFlushNever_) {
+	if (mode != kFormatFlushNever_) {
 		format_output_flush(output);
 		output->flush_mode = mode;
 	}
