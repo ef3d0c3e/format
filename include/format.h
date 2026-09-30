@@ -84,13 +84,16 @@ struct format_output;
 #if defined(_Static_assert)
 #define FORMAT__STATIC_ASSERT(cond, ...) _Static_assert(cond, __VA_ARGS__)
 #else
-#define FORMAT___STATIC_ASSERT2(ident_, cond, ...) typedef char ident_[(cond) ? 1 : -1] format_unused
-#define FORMAT___STATIC_ASSERT1(ident_, id_, cond, ...) FORMAT___STATIC_ASSERT2(ident_##id_, cond, __VA_ARGS__)
-#define FORMAT___STATIC_ASSERT0(ident_, id_, cond, ...) FORMAT___STATIC_ASSERT1(ident_, id_, cond, __VA_ARGS__)
-#define FORMAT__STATIC_ASSERT(cond, ...)                                                              \
-	FORMAT__START_DIAG(clang) \
-	FORMAT__DIAG(clang, ignored "-Wc2y-extensions") \
-	FORMAT___STATIC_ASSERT0(format__static_assert_, __COUNTER__, cond, __VA_ARGS__)\
+#define FORMAT___STATIC_ASSERT2(ident_, cond, ...)                                               \
+	typedef char ident_[(cond) ? 1 : -1] format_unused
+#define FORMAT___STATIC_ASSERT1(ident_, id_, cond, ...)                                          \
+	FORMAT___STATIC_ASSERT2(ident_##id_, cond, __VA_ARGS__)
+#define FORMAT___STATIC_ASSERT0(ident_, id_, cond, ...)                                          \
+	FORMAT___STATIC_ASSERT1(ident_, id_, cond, __VA_ARGS__)
+#define FORMAT__STATIC_ASSERT(cond, ...)                                                         \
+	FORMAT__START_DIAG(clang)                                                                    \
+	FORMAT__DIAG(clang, ignored "-Wc2y-extensions")                                              \
+	FORMAT___STATIC_ASSERT0(format__static_assert_, __COUNTER__, cond, __VA_ARGS__)              \
 	FORMAT__END_DIAG(clang)
 #endif
 
@@ -984,7 +987,7 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 
 #define FORMAT__MAPPER_CHOOSE(ARG, RULE)                                                         \
 	__builtin_choose_expr(__builtin_types_compatible_p(FORMAT__SELECT(0, RULE), typeof(ARG)),    \
-	                      format_arg__.payload.formatter = FORMAT__SELECT(1, RULE),                      \
+	                      format_arg__.payload.formatter = FORMAT__SELECT(1, RULE),              \
 	                      (void)0);
 #define FORMAT__CHOOSE(ARG)                                                                      \
 	FORMAT__EXPAND(                                                                              \
@@ -1012,16 +1015,16 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 	format_arg__.type = kFormatCollection;                                                       \
 	typeof(*FIELD)* format_arg_triplet__ = FIELD;                                                \
 	(void)format_arg_triplet__;                                                                  \
-	format_arg__.payload.collection = (DATA);                                                            \
-	assert(format_arg__.payload.collection.next != NULL);                                                \
-	assert(format_arg__.payload.collection.width != NULL);                                               \
-	assert(format_arg__.payload.collection.formatter != NULL);                                           \
+	format_arg__.payload.collection = (DATA);                                                    \
+	assert(format_arg__.payload.collection.next != NULL);                                        \
+	assert(format_arg__.payload.collection.width != NULL);                                       \
+	assert(format_arg__.payload.collection.formatter != NULL);                                   \
 	format_arg__.data = (uint64_t)(uintptr_t)(FIELD);
 #define FORMAT__FORMATTER_TRIPLET_SUBOBJECT(FORMATTER, FIELD)                                    \
 	typeof(FIELD)* format_arg_triplet__ = (&FIELD);                                              \
 	(void)format_arg_triplet__;                                                                  \
 	format_arg__.type = kFormatScalar;                                                           \
-	format_arg__.payload.formatter = (FORMATTER);                                                        \
+	format_arg__.payload.formatter = (FORMATTER);                                                \
 	format_arg__.data = (uint64_t)(uintptr_t)(&FIELD);
 #define FORMAT__FORMATTER_TRIPLET(TAG, X, Y) FORMAT__CAT(FORMAT__FORMATTER_TRIPLET_, TAG)(X, Y)
 
@@ -1038,21 +1041,21 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		format_arg__.type = kFormatScalar;                                                       \
 		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__FORMATTER_TRIPLET(                      \
 		  FORMAT__SELECT(0, ARG), FORMAT__SELECT(1, ARG), FORMAT__SELECT(2, ARG)))(              \
-		  FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(format_arg__.payload.formatter =                         \
+		  FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(format_arg__.payload.formatter =                 \
 		                                          FORMAT__SELECT(0, ARG))(FORMAT__CHOOSE(ARG))); \
 		FORMAT__IF_ELSE(                                                                         \
 		  FORMAT__IS_TRIPLET(ARG))()(/* respect strict-aliasing */                               \
-		                             assert(format_arg__.payload.formatter != NULL &&                    \
+		                             assert(format_arg__.payload.formatter != NULL &&            \
 		                                    "Could not find formatter for argument"));           \
 		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))()(                                              \
 		  format_arg__.data = __builtin_choose_expr(                                             \
 		    FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)),                                 \
-		    __extension__({ (uint64_t)(uintptr_t)(FORMAT__MAPPER_VALUE(ARG)); }),                          \
+		    __extension__({ (uint64_t)(uintptr_t)(FORMAT__MAPPER_VALUE(ARG)); }),                \
 		    __extension__({                                                                      \
 			    const typeof(FORMAT__MAPPER_VALUE(ARG)) format_temp__ =                          \
 			      FORMAT__MAPPER_VALUE(ARG);                                                     \
 			    typeof(format_arg__.data) format_result__ = 0;                                   \
-			    FORMAT__STATIC_ASSERT(sizeof(typeof(format_arg__.data)) <= sizeof(uint64_t));   \
+			    FORMAT__STATIC_ASSERT(sizeof(typeof(format_arg__.data)) <= sizeof(uint64_t));    \
 			    memcpy(&format_result__, &format_temp__, sizeof(format_temp__));                 \
 			    format_result__;                                                                 \
 		    })));                                                                                \
@@ -1271,17 +1274,6 @@ format__collection_array_width(struct format_arg_collection* collection,
 		                     FORMAT__SELECT(0, 0, ARG),                                          \
 		                     FORMAT__SELECT(0, 1, ARG),                                          \
 		                     FORMAT__SELECT(0, 2, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, ARG)))
-
-#define FORMAT__OBJ_MAPPER_(N, CONST, ARG)                                                       \
-	{ FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(FORMAT__OBJ_MAPPER_P(                                \
-	  N, CONST, ARG, FORMAT__SELECT(0, 0, ARG), FORMAT__SELECT(0, 1, ARG)))(                     \
-	  FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__OBJ__MAPPER_T(                            \
-		N,                                                                                       \
-		CONST,                                                                                   \
-		ARG,                                                                                     \
-		FORMAT__SELECT(0, 0, ARG),                                                               \
-		FORMAT__SELECT(1, ARG),                                                                  \
-		FORMAT__SELECT(0, 1, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, (ARG)))) }
 
 #define FORMAT_OBJ(TYPE, FUN, ...)                                                               \
 	int format_warn_unused_result format_nonnull(1, 2, 3) FUN(struct format_output* output,      \

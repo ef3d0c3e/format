@@ -1,4 +1,4 @@
-name: Tests (i386)
+name: Tests (arm32)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    name: Test i386 (${{ matrix.compiler }})
+    name: Test arm32 (${{ matrix.compiler }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -29,12 +29,12 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: linux/386
+          platforms: linux/arm/v7
 
-      - name: Start i386 container
+      - name: Start armhf container
         run: |
           docker run -d --name build \
-            --platform linux/386 \
+            --platform linux/arm/v7 \
             -e CC \
             -e DEBIAN_FRONTEND=noninteractive \
             -v "${GITHUB_WORKSPACE}:/work" \
@@ -42,11 +42,11 @@ jobs:
             debian:sid sleep infinity
 
       - name: Show architecture
-        run: docker exec build linux32 sh -c 'uname -m && dpkg --print-architecture'
+        run: docker exec build sh -c 'uname -m && dpkg --print-architecture'
 
       - name: Install dependencies
         run: |
-          docker exec build linux32 sh -euxc '
+          docker exec build sh -euxc '
             apt-get update
             apt-get install -y --no-install-recommends \
               ca-certificates \
@@ -57,14 +57,27 @@ jobs:
               ninja-build \
               cmake \
               pkg-config \
-              libcriterion-dev \
               libgpg-error-dev \
-              libzstd-dev
+              libzstd-dev \
+              libffi-dev \
+              libgit2-dev
             git config --global --add safe.directory /work
           '
 
+      # debian does not package libcriterion-dev, so we install it's dependencies and install it from the submodule
+      - name: Build and install Criterion from submodule
+        run: |
+          docker exec build sh -euxc '
+            cd /work/libs/criterion
+            meson setup /tmp/criterion-build --prefix=/usr --buildtype=release
+            ninja -C /tmp/criterion-build
+            ninja -C /tmp/criterion-build install
+            ldconfig
+            pkg-config --modversion criterion
+          '
+
       - name: Show compiler version
-        run: docker exec build linux32 sh -c '$CC --version'
+        run: docker exec build sh -c '$CC --version'
 
       - name: Test
-        run: docker exec build linux32 make test
+        run: docker exec build make test
