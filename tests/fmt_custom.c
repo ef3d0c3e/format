@@ -116,3 +116,123 @@ Test(fmt_custom, allocator_fd)
 
 	close(fd);
 }
+
+static void*
+null_malloc(size_t size)
+{
+	(void)size;
+	return NULL;
+}
+
+static void
+null_free(void *ptr, size_t size)
+{
+	(void)ptr;
+	(void)size;
+}
+
+static void*
+null_realloc(void *ptr, size_t old_size, size_t new_size)
+{
+	(void)ptr;
+	(void)old_size;
+	(void)new_size;
+	return NULL;
+}
+
+/* Allocator failure must fail and return properly */
+Test(fmt_custom, null_alloc) {
+	struct format_output out = format_output_buf();
+	format_output_set_allocator(&out, null_malloc, null_free, null_realloc);
+
+	int result = format(&out, "Hello, {}!", "World");
+	cr_assert_neq(result, 0);
+
+	format_output_destroy(&out);
+}
+
+Test(fmt_custom, null_alloc_fd) {
+	char name[256];
+	sprintf(name, "/fmt-test-custom-%d", (int)getpid());
+	int fd = shm_open(name, O_CLOEXEC | O_CREAT | O_EXCL | O_RDWR, 0600);
+	cr_assert(fd != -1, "Failed to open memory fd");
+	shm_unlink(name);
+
+	struct format_output out = format_output_fd(fd);
+	format_output_set_flush(&out, kFormatFlushNone);
+	format_output_set_allocator(&out, null_malloc, null_free, null_realloc);
+
+	int result = format(&out, "Hello, {}!", "World");
+	cr_assert_neq(result, 0);
+
+	format_output_destroy(&out);
+	close(fd);
+}
+
+/* Simple mmap-based allocator */
+static void*
+mmap_malloc(size_t size)
+{
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	size_t n = 1;
+	while (page * n < size)
+		n *= 2;
+	void *ptr = mmap(NULL, n * page, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	if (ptr == MAP_FAILED)
+		return NULL;
+	return ptr;
+}
+
+static void
+mmap_free(void *ptr, size_t size)
+{
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	// Does not need to be page-aligned
+	munmap(ptr, size);
+}
+
+static void*
+mmap_realloc(void *ptr, size_t old_size, size_t new_size)
+{
+	if (!ptr)
+	{
+		cr_assert_eq(old_size, 0);
+		return mmap_malloc(new_size);
+	}
+
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+
+	// Must align old_size
+	{
+		size_t n = old_size / page;
+		while (n * page < old_size)
+			++n;
+		old_size = n * page;
+	}
+
+	size_t n = 1;
+	while (page * n < new_size)
+		n *= 2;
+	void *new_ptr = mremap(ptr, old_size, n * page, MREMAP_MAYMOVE);
+	if (new_ptr == MAP_FAILED)
+		return NULL;
+	return new_ptr;
+}
+
+Test(fmt_custom, mmap_alloc) {
+	struct format_output out = format_output_buf();
+	format_output_set_allocator(&out, mmap_malloc, mmap_free, mmap_realloc);
+
+	int result = format(&out, "Hello, {}!", "World");
+	cr_assert_eq(result, 0);
+	cr_assert_eq(out.nwritten, 13);
+	cr_assert_eq(memcmp(out.data, "Hello, World!", 13), 0);
+
+	char buf[4096];
+	memset(buf, 'x', sizeof(buf));
+	cr_assert_eq(format_output_write(&out, buf, 4096), 0);
+	cr_assert_eq(out.nwritten, 13 + 4096);
+	cr_assert_eq(memcmp(out.data + 13, buf, 4096), 0);
+
+	format_output_destroy(&out);
+}

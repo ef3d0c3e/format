@@ -1,6 +1,8 @@
 #ifndef FORMAT_TESTS_UTIL_H
 #define FORMAT_TESTS_UTIL_H
 
+#define _GNU_SOURCE
+
 #include <criterion/criterion.h>
 #include <criterion/logging.h>
 

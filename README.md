@@ -463,11 +463,11 @@ typedef int (*format_collection_iterator)(const struct format_arg_collection* co
                                           format_collection_callback callback, /* function called on every array elements */
                                           void* cookie /* data to pass to `callback` */);
 ```
- - `N` is the number of elements to display from the collection, it will be passed to 
- - `{x}` is the format string for every element inside the collection
- - `collection` is a pointer to the collection (array, linked list head, tree root, ...)
- - `iterator` is the iterator
- - `formatter` is the formatter for elements inside the collection
+ - `N` is the number of elements to display from the collection, it will be passed to the iterator.
+ - `{x}` is the format string for every element inside the collection.
+ - `collection` is a pointer to the collection (array, linked list head, tree root, ...).
+ - `iterator` is the iterator.
+ - `formatter` is the formatter for elements inside the collection.
 
 Here are two example iterators implementation, for arrays and a linked list:
 ```c
@@ -533,7 +533,7 @@ iterator_linked_list(const struct format_arg_collection* collection,
 
 The iterator for arrays is part of format, so you can invoke it like this:
  - `FORMAT_ARRAY(array)` if you want to use the default formatter for elements
- - `FORMAT_ARRAY(array, collection)` if you whish to specify the formatter
+ - `FORMAT_ARRAY(array, collection)` if you wish to specify the formatter
 
 **Examples**
 ```c
@@ -564,6 +564,73 @@ const struct node head = {
 };
 format(out, "{:[6]:{x}}", FORMAT_COLLECTION(&head, iterator_linked_list, format_fmt_int));
 ```
+
+## Custom Allocators
+
+You can specify custom allocators that will be used by the library when needed:
+ - `void* malloc(size_t size)`: A memory allocator, returns `NULL` on errors
+ - `void* free(void *ptr, size_t size)`: A freeing function, `size` is the requested allocation size for `ptr`
+ - `void* realloc(void *ptr, size_t old_size, size_t new_size)`: A re-allocator function, `old_size` is the requested allocation size for `ptr`. `new_size` is the requested size.
+ When `ptr` is `NULL`, it must behave like `malloc(new_size)`.
+
+Here's an example, `mmap`-based custom allocator:
+```c
+/* Simple mmap-based allocator */
+static void*
+mmap_malloc(size_t size)
+{
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	size_t n = 1;
+	while (page * n < size)
+		n *= 2;
+	void *ptr = mmap(NULL, n * page, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	if (ptr == MAP_FAILED)
+		return NULL;
+	return ptr;
+}
+
+static void
+mmap_free(void *ptr, size_t size)
+{
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	// size does not need to be aligned to a page boundary
+	munmap(ptr, size);
+}
+
+static void*
+mmap_realloc(void *ptr, size_t old_size, size_t new_size)
+{
+	if (!ptr)
+	{
+		cr_assert_eq(old_size, 0);
+		return mmap_malloc(new_size);
+	}
+
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+
+	// Must align old_size to page boundaries
+	{
+		size_t n = old_size / page;
+		while (n * page < old_size)
+			++n;
+		old_size = n * page;
+	}
+
+	size_t n = 1;
+	while (page * n < new_size)
+		n *= 2;
+	void *new_ptr = mremap(ptr, old_size, n * page, MREMAP_MAYMOVE);
+	if (new_ptr == MAP_FAILED)
+		return NULL;
+	return new_ptr;
+}
+```
+
+Once you've created a `struct format_output`, you may call `format_output_set_allocator`, for instance like this:
+```
+format_output_set_allocator(&out, mmap_malloc, mmap_free, mmap_realloc);
+```
+**NOTE:** It is undefined behavior to change the allocator after you've called `format` or `format_output_write` on the output.
 
 ## Experimental APIs
 
