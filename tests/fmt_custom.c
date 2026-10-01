@@ -187,7 +187,7 @@ static void
 mmap_free(void *ptr, size_t size)
 {
 	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
-	// Does not need to be page-aligned
+	// size does not need to be aligned to a page boundary
 	munmap(ptr, size);
 }
 
@@ -202,7 +202,7 @@ mmap_realloc(void *ptr, size_t old_size, size_t new_size)
 
 	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
 
-	// Must align old_size
+	// Must align old_size to page boundaries
 	{
 		size_t n = old_size / page;
 		while (n * page < old_size)

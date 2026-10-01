@@ -75,6 +75,16 @@ Test(fmt_collection, basic)
 	}
 }
 
+Test(fmt_collection, align) {
+	const int arr[16] = {
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+	};
+
+	test_manual("|{:[5]40:{}}|", "|{0, 1, 2, 3, 4}                         |", FORMAT_ARRAY(arr));
+	test_manual("|{:[5]^40:{}}|", "|             {0, 1, 2, 3, 4}            |", FORMAT_ARRAY(arr));
+	test_manual("|{:[5]>40:{}}|", "|                         {0, 1, 2, 3, 4}|", FORMAT_ARRAY(arr));
+}
+
 /* Linked list */
 struct node
 {
