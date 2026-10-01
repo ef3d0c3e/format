@@ -322,9 +322,9 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 
 			/* Copy */
 			memcpy(output->data + output->size, buf, len);
-			output->nwritten += len;
 		}
 		output->size += len;
+		output->nwritten += len;
 	}
 
 	return 0;
