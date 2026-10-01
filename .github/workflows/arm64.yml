@@ -8,6 +8,7 @@ jobs:
   test:
     name: Test arm64 (${{ matrix.compiler }})
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
