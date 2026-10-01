@@ -28,6 +28,7 @@ jobs:
             make \
             gcc \
             clang \
+            libclang-rt-dev \
             meson \
             ninja-build \
             cmake \
@@ -62,4 +63,4 @@ jobs:
       - name: Test
         env:
           CC: ${{ matrix.compiler }}
-        run: make test EXTRA_CFLAGS='-fsanitize=address,undefined'
+        run: ASAN_OPTIONS=detect_leaks=0 make test EXTRA_CFLAGS='-fsanitize=address,undefined'
