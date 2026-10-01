@@ -37,8 +37,8 @@ LFLAGS += $(LIBFORMAT_A)
 
 # Rule for building libformat.a
 $(LIBFORMAT_A):
-	@echo "Building libformat..."
-	$(MAKE) -C $(dir $(LIBFORMAT_A))
+    @echo "Building libformat..."
+    $(MAKE) -C $(dir $(LIBFORMAT_A))
 
 # Add this all your targets that depend on libformat:
 my-target: $(LIBFORMAT_A)
@@ -163,53 +163,53 @@ int format_pair(struct format_output* output,
                const struct format_env* env,
                size_t idx)
 {
-	struct format_spec_placeholder fill; // fill character
+    struct format_spec_placeholder fill; // fill character
     char align = '<'; // alignment kind
     size_t width = 0; // field width
-	
-	size_t i = 0;
-	if (fmt_spec[i] != '}')
-	{
-		format_parse_alignment(fmt_spec, &i, env, &align, &fill, " " /* default: fill using spaces */);
-		width = format_parse_size(fmt_spec, &i, env);
-	}
-	assert(fmt_spec[i] == '}');
+    
+    size_t i = 0;
+    if (fmt_spec[i] != '}')
+    {
+        format_parse_alignment(fmt_spec, &i, env, &align, &fill, " " /* default: fill using spaces */);
+        width = format_parse_size(fmt_spec, &i, env);
+    }
+    assert(fmt_spec[i] == '}');
 
-	// Get the pair
-	const struct pair *pair = (const struct pair*)env->args[idx].data;
+    // Get the pair
+    const struct pair *pair = (const struct pair*)env->args[idx].data;
 
-	// Compute the width it takes to format the pair
-	struct format_output width_output = format_output_none();
-	format(&width_output, "({}, {})", pair->a, pair->b);
-	const size_t fmt_width = width_output.size;
+    // Compute the width it takes to format the pair
+    struct format_output width_output = format_output_none();
+    format(&width_output, "({}, {})", pair->a, pair->b);
+    const size_t fmt_width = width_output.size;
 
 
-	// Compute left/right alignment
-	size_t left = 0, right = 0;
-	switch (align) {
-		case '^':
-			left = (width > fmt_width ? width - fmt_width : 0);
-			right = left / 2;
-			left -= right;
-			break;
-		case '<':
-			right = width > fmt_width ? width - fmt_width : 0;
-			break;
-		case '>':
-			left = width > fmt_width ? width - fmt_width : 0;
-			break;
-	}
+    // Compute left/right alignment
+    size_t left = 0, right = 0;
+    switch (align) {
+        case '^':
+            left = (width > fmt_width ? width - fmt_width : 0);
+            right = left / 2;
+            left -= right;
+            break;
+        case '<':
+            right = width > fmt_width ? width - fmt_width : 0;
+            break;
+        case '>':
+            left = width > fmt_width ? width - fmt_width : 0;
+            break;
+    }
 
-	// Write left spacing
-	if (format_write_placeholder(output, &fill, left, 0))
-		return -1;
-	
-	// Write pair values
-	format(output, "({}, {})", pair->a, pair->b);
+    // Write left spacing
+    if (format_write_placeholder(output, &fill, left, 0))
+        return -1;
+    
+    // Write pair values
+    format(output, "({}, {})", pair->a, pair->b);
 
-	// Write Right spacing
-	if (format_write_placeholder(output, &fill, right, 1 /* to print in reverse */))
-		return -1;
+    // Write Right spacing
+    if (format_write_placeholder(output, &fill, right, 1 /* to print in reverse */))
+        return -1;
 
     return 0;
 }
@@ -446,24 +446,133 @@ The library is compiled with `-Wall -Wextra -Wconversion -pedantic -std=gnu23`.
 By default it builds using this additional flag: `-ggdb`. This is controlled by `EXTRA_CFLAGS`, which you can set when calling `make -C` from your own Makefile:
 ```make
 $(LIBFORMAT_A):
-	@echo "Building libformat..."
-	$(MAKE) EXTRA_CFLAGS='-O2' -C $(dir $(LIBFORMAT_A))
+    @echo "Building libformat..."
+    $(MAKE) EXTRA_CFLAGS='-O2' -C $(dir $(LIBFORMAT_A))
+```
+
+## Collection formatting
+
+You can format collections with the following code:
+```c
+format(out, "{:[N]:{x}}", FORMAT_COLLECTION(collection, iterator, formatter))
+
+// Where iterator:
+typedef int (*format_collection_iterator)(const struct format_arg_collection* collection,
+                                          const void* data, /* formatted collection
+                                          size_t n, /* number between `[` and `]` in the format string */
+                                          format_collection_callback callback, /* function called on every array elements */
+                                          void* cookie /* data to pass to `callback` */);
+```
+ - `N` is the number of elements to display from the collection, it will be passed to 
+ - `{x}` is the format string for every element inside the collection
+ - `collection` is a pointer to the collection (array, linked list head, tree root, ...)
+ - `iterator` is the iterator
+ - `formatter` is the formatter for elements inside the collection
+
+Here are two example iterators implementation, for arrays and a linked list:
+```c
+/* Array iterator */
+static int
+iterator_array(const struct format_arg_collection* collection,
+                                  const void* array,
+                                  size_t n,
+                                  format_collection_callback callback,
+                                  void* cookie)
+{
+    for (size_t i = 0; i < n; ++i) {
+        const void* val = (const void*)((const char*)array + i * collection->elem_size);
+
+        int result;
+        if (collection->is_pointer) {
+            result = callback(collection, (uint64_t)*(uintptr_t*)val, cookie);
+        } else {
+            uint64_t value = 0;
+            memcpy(&value, val, collection->elem_size);
+            result = callback(collection, value, cookie);
+        }
+        if (result == -1)
+            return -1;
+        if (result == 0)
+            break;
+    }
+
+    return 0;
+}
+
+/* Linked-list */
+struct node
+{
+    int val;
+    struct node* next;
+};
+
+/* Linked-list iterator */
+int
+iterator_linked_list(const struct format_arg_collection* collection,
+                       const void* head,
+                       size_t n,
+                       format_collection_callback callback,
+                       void* cookie)
+{
+    struct node* node = (struct node*)head;
+    for (size_t i = 0; node && i < n; ++i) {
+        int result;
+        // No specific logic around collection->elem_size/is_pointer because node just stores `int`
+        uint64_t value = node->val;
+        result = callback(collection, value, cookie);
+        if (result == -1)
+            return -1;
+        if (result == 0)
+            break;
+        node = node->next;
+    }
+
+    return 0;
+}
+```
+
+The iterator for arrays is part of format, so you can invoke it like this:
+ - `FORMAT_ARRAY(array)` if you want to use the default formatter for elements
+ - `FORMAT_ARRAY(array, collection)` if you whish to specify the formatter
+
+**Examples**
+```c
+
+// Array
+int arr[] = {1, 2, 3, 4, 5, 6};
+format(out, "{:[6]:{b}}", FORMAT_ARRAY(arr));
+
+// Linked list
+const struct node head = {
+    .val = 1,
+    .next = &(struct node){
+        .val = 2,
+        .next = &(struct node){
+            .val = 3,
+            .next = &(struct node){
+                .val = 4,
+                .next = &(struct node){
+                    .val = 5,
+                    .next = &(struct node){
+                        .val = 6,
+                        .next = NULL,
+                    },
+                },
+            },
+        },
+    },
+};
+format(out, "{:[6]:{x}}", FORMAT_COLLECTION(&head, iterator_linked_list, format_fmt_int));
 ```
 
 ## Experimental APIs
 
-Currently there are 2 experimental APIs: Object formatting, and Collection formatting.
+Currently there is 1 experimental APIs: Object formatting.
 
 **Object formatting**
 
 Object formatting is 'functional' as of now, but formatting of sub-objects is still not up to standards. Mainly, it's missing automatic indentation, you have to manually specify the 'depth' of sub-objects such that they appear with the correct number of tabs.
 While it's undocumented, you can read [tests/fmt_object.c](tests/fmt_object.c), on how the macro works.
-
-**Collection formatting**
-
-This API is partially exposed via the `FORMAT_ARRAY` macro.
-While the `FORMAT_ARRAY` is functional, the underlying API needs a complete overhaul. In particular I want to ditch the `void*` generics, in favor of macro-based monomorphization. So I'd recommend against implement any custom collection formatter for now.
-
 
 # Q&A
 

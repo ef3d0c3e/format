@@ -1074,7 +1074,8 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__FORMATTER_TRIPLET(                      \
 		  FORMAT__SELECT(0, ARG), FORMAT__SELECT(1, ARG), FORMAT__SELECT(2, ARG)))(              \
 		  FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(format_arg__.payload.formatter =                 \
-		                                          FORMAT__SELECT(0, ARG))(format_arg__.payload.formatter = FORMAT__CHOOSE(ARG))); \
+		                                          FORMAT__SELECT(0, ARG))(                       \
+		    format_arg__.payload.formatter = FORMAT__CHOOSE(ARG)));                              \
 		FORMAT__IF_ELSE(                                                                         \
 		  FORMAT__IS_TRIPLET(ARG))()(/* respect strict-aliasing */                               \
 		                             assert(format_arg__.payload.formatter != NULL &&            \
@@ -1161,7 +1162,7 @@ format__collection_iterator_array(const struct format_arg_collection* collection
 #define FORMAT__ARRAY_0(ARRAY)                                                                   \
 	(COLLECTION,                                                                                 \
 	 ((struct format_arg_collection){ .iterator = format__collection_iterator_array,             \
-	                                  .formatter = FORMAT__CHOOSE(*format_arg_triplet__),                       \
+	                                  .formatter = FORMAT__CHOOSE(*format_arg_triplet__),        \
 	                                  .elem_size = sizeof(*(format_arg_triplet__)),              \
 	                                  .is_pointer =                                              \
 	                                    FORMAT__IS_POINTER_VAR_P(*(format_arg_triplet__)) }),    \
@@ -1184,6 +1185,22 @@ format__collection_iterator_array(const struct format_arg_collection* collection
 #define FORMAT_ARRAY(ARRAY, ...)                                                                 \
 	FORMAT__IF_ELSE(FORMAT__HAS_ARGS(__VA_ARGS__))(FORMAT__ARRAY_1(ARRAY, __VA_ARGS__))(         \
 	  FORMAT__ARRAY_0(ARRAY))
+
+/**
+ * @brief Format macro for collections
+ *
+ * @param COL Collection to format
+ * @param ITERATOR Iterator for @p COL
+ * @param FORMATTER Formatter for elements in @p COL
+ */
+#define FORMAT_COLLECTION(COL, ITERATOR, FORMATTER)                                              \
+	(COLLECTION,                                                                                 \
+	 ((struct format_arg_collection){ .iterator = ITERATOR,                                      \
+	                                  .formatter = FORMATTER,                                    \
+	                                  .elem_size = sizeof(*(format_arg_triplet__)),              \
+	                                  .is_pointer =                                              \
+	                                    FORMAT__IS_POINTER_VAR_P(*(format_arg_triplet__)) }),    \
+	 COL)
 
 /** @} */
 
@@ -1271,11 +1288,11 @@ format__collection_iterator_array(const struct format_arg_collection* collection
 	                         ))(                                                                 \
 	  FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(FORMAT__SELECT(0, ARG)))(                               \
 	    FORMAT__OBJ_MAPPER_T(N,                                                                  \
-	                         CONST,                                                              \
-	                         ARG,                                                                \
-	                         FORMAT__SELECT(0, 0, ARG),                                          \
-	                         FORMAT__SELECT(0, 1, ARG),                                          \
-	                         FORMAT__SELECT(0, 2, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, ARG)))
+		                     CONST,                                                              \
+		                     ARG,                                                                \
+		                     FORMAT__SELECT(0, 0, ARG),                                          \
+		                     FORMAT__SELECT(0, 1, ARG),                                          \
+		                     FORMAT__SELECT(0, 2, ARG)))(FORMAT__OBJ_MAPPER_S(N, CONST, ARG)))
 
 #define FORMAT_OBJ(TYPE, FUN, ...)                                                               \
 	int format_warn_unused_result format_nonnull(1, 2, 3) FUN(struct format_output* output,      \
