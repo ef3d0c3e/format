@@ -227,9 +227,8 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 					return -1;
 
 				// Write until the last newline
-				while (pos != nl_pos) {
-					assert(pos < nl_pos);
-					const ssize_t n = write(output->fd, buf + pos, nl_pos - pos);
+				while (pos <= nl_pos) {
+					const ssize_t n = write(output->fd, buf + pos, nl_pos - pos + 1);
 					if (n < 0 && errno == EINTR) {
 						continue;
 					} else if (n < 0) {
@@ -245,7 +244,7 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 			assert(len >= pos);
 		}
 		const size_t left = len - pos;
-		/* If leftover is small, copy it to buffer, otherwise write it instantly */
+		/* If leftover is small, copy it to buffer */
 		if (left <= output->capacity - output->size) {
 			memcpy(output->data + output->size, buf + pos, left);
 			output->size += left;
@@ -253,9 +252,17 @@ format_output_write(struct format_output* output, const char* buf, size_t len)
 			return 0;
 		}
 
-		/* Otherwise, flush buffer, and write whatever is left directly, without buffering */
+		/* Not enough space in buffer: flush, to buffer again, or write without buffering if writes are large */
 		if (format_output_flush(output))
 			return -1;
+		if (left <= output->capacity)
+		{
+			memcpy(output->data, buf + pos, left);
+			output->size += left;
+			output->nwritten += left;
+			return 0;
+		}
+
 		while (pos != len) {
 			assert(pos < len);
 			const ssize_t n = write(output->fd, buf + pos, len - pos);
