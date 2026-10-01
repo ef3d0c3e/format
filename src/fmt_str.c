@@ -169,7 +169,6 @@ format_fmt_str(struct format_output* output,
 	for (size_t i = 0; i < len;) {
 		const size_t cp = format_utf8_len(val + i, len - i);
 		if (spec.type == 's') /* Write as-is */ {
-
 			if (cp == 0) {
 				if (format_output_write(output, val + i, 1))
 					return -1;
@@ -177,9 +176,12 @@ format_fmt_str(struct format_output* output,
 				if (format_output_write(output, val + i, cp))
 					return -1;
 			}
-		} else /* Escape */ {
-			/* Printable */
-			if (isprint(val[i]) || val[i] == '\t') {
+		} else {
+			if (cp > 1) /* Valid codepoint */ {
+				if (format_output_write(output, val + i, cp))
+					return -1;
+			} /* Printable */
+			else if (isprint(val[i]) || val[i] == '\t') {
 				if (format_output_write(output, val + i, 1))
 					return -1;
 			} else if (spec.type == '?' && val[i] != 0 &&
@@ -212,8 +214,8 @@ format_fmt_str(struct format_output* output,
 			} else {
 				buf[0] = spec.type == 'x' ? '0' : '\\';
 				buf[1] = 'x';
-				buf[2] = FORMAT_HEX[(unsigned char)val[i] / 16];
-				buf[3] = FORMAT_HEX[(unsigned char)val[i] % 16];
+				buf[2] = FORMAT_HEX_CAPITAL[(unsigned char)val[i] / 16];
+				buf[3] = FORMAT_HEX_CAPITAL[(unsigned char)val[i] % 16];
 				if (format_output_write(output, buf, 4))
 					return -1;
 			}

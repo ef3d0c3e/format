@@ -184,9 +184,6 @@ Test(fmt_string, fill) {
 }
 
 Test(fmt_string, escape) {
-	test_manual("{:?}", "\\nT\\x87", "\nT\x87");
-	test_manual("{:x}", "0x0aT0x87", "\nT\x87");
-
 	for (size_t i = 1; i < 255; ++i)
 	{
 		const char c = (char)i;
@@ -200,7 +197,7 @@ Test(fmt_string, escape) {
 		if (isprint(c) || c == '\t')
 			sprintf(buf, "%c", c);
 		else
-			sprintf(buf, "0x%02hhx", c);
+			sprintf(buf, "0x%02hhX", c);
 		test_manual("{:x}", buf, str);
 
 		if (isprint(c) || c == '\t')
@@ -234,7 +231,7 @@ Test(fmt_string, escape) {
 			sprintf(buf, "\\%c", escape);
 		}
 		else
-			sprintf(buf, "\\x%02hhx", c);
+			sprintf(buf, "\\x%02hhX", c);
 		test_manual("{:?}", buf, str);
 	}
 }

@@ -24,8 +24,8 @@ Test(fmt_char, types) {
 		{
 			buf[0] = '0';
 			buf[1] = 'x';
-			buf[2] = "0123456789abcdef"[i / 16];
-			buf[3] = "0123456789abcdef"[i % 16];
+			buf[2] = "0123456789ABCDEF"[i / 16];
+			buf[3] = "0123456789ABCDEF"[i % 16];
 		}
 		test_manual("{:x}", buf, c);
 	}
@@ -67,8 +67,8 @@ Test(fmt_char, types) {
 		{
 			buf[0] = '\\';
 			buf[1] = 'x';
-			buf[2] = "0123456789abcdef"[i / 16];
-			buf[3] = "0123456789abcdef"[i % 16];
+			buf[2] = "0123456789ABCDEF"[i / 16];
+			buf[3] = "0123456789ABCDEF"[i % 16];
 		}
 		test_manual("{:?}", buf, c);
 	}

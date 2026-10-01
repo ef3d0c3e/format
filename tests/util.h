@@ -53,7 +53,6 @@ static inline void print_buffer(const char *buf, size_t len)
 			const size_t clen = utf8_len(&buf[i], len - i);
 			if (clen > 1)
 			{
-				printf("'%zu'",clen);
 				printf("%.*s", (int)len, &buf[i]);
 				i += clen - 1;
 			}

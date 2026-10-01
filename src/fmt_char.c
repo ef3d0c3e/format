@@ -142,59 +142,49 @@ format_fmt_char(struct format_output* output,
 
 	/* Content */
 	char buf[16];
-	if (isprint(val) || val == '\t') {
+
+	if (spec.type == 'c') /* Write as-is */ {
 		if (format_output_write(output, &val, 1))
 			return -1;
-	} else if (val != 0 && strchr("\a\b\n\v\f\r", val) && spec.type == '?') {
-		buf[0] = '\\';
-		switch (val) {
-			case '\a':
-				buf[1] = 'a';
-				break;
-			case '\b':
-				buf[1] = 'b';
-				break;
-			case '\n':
-				buf[1] = 'n';
-				break;
-			case '\v':
-				buf[1] = 'v';
-				break;
-			case '\f':
-				buf[1] = 'f';
-				break;
-			case '\r':
-				buf[1] = 'r';
-				break;
-			default:
-				format_unreachable();
-		}
-		if (format_output_write(output, buf, 2))
-			return -1;
 	} else {
-		switch (spec.type) {
-			case 'c':
-				if (format_output_write(output, &val, 1))
-					return -1;
-				break;
-			case '?':
-				buf[0] = '\\';
-				buf[1] = 'x';
-				buf[2] = FORMAT_HEX[(unsigned char)val / 16];
-				buf[3] = FORMAT_HEX[(unsigned char)val % 16];
-				if (format_output_write(output, buf, 4))
-					return -1;
-				break;
-			case 'x':
-				buf[0] = '0';
-				buf[1] = 'x';
-				buf[2] = FORMAT_HEX[(unsigned char)val / 16];
-				buf[3] = FORMAT_HEX[(unsigned char)val % 16];
-				if (format_output_write(output, buf, 4))
-					return -1;
-				break;
-			default:
-				format_unreachable();
+		/* Printable */
+		if (isprint(val) || val == '\t') {
+			if (format_output_write(output, &val, 1))
+				return -1;
+		} else if (spec.type == '?' && val != 0 &&
+				strchr("\a\b\n\v\f\r", val)) /* Standard escape codes */ {
+			buf[0] = '\\';
+			switch (val) {
+				case '\a':
+					buf[1] = 'a';
+					break;
+				case '\b':
+					buf[1] = 'b';
+					break;
+				case '\n':
+					buf[1] = 'n';
+					break;
+				case '\v':
+					buf[1] = 'v';
+					break;
+				case '\f':
+					buf[1] = 'f';
+					break;
+				case '\r':
+					buf[1] = 'r';
+					break;
+				default:
+					format_unreachable();
+			}
+			if (format_output_write(output, buf, 2))
+				return -1;
+		} else {
+			buf[0] = spec.type == 'x' ? '0' : '\\';
+			buf[1] = 'x';
+			buf[2] = FORMAT_HEX_CAPITAL[(unsigned char)val / 16];
+			buf[3] = FORMAT_HEX_CAPITAL[(unsigned char)val % 16];
+			if (format_output_write(output, buf, 4))
+				return -1;
 		}
 	}
 
