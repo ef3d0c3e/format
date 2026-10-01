@@ -81,8 +81,8 @@ struct format_output;
 #endif
 
 /** @brief `format_static_assert` implementation */
-#if defined(_Static_assert)
-#define FORMAT__STATIC_ASSERT(cond, ...) _Static_assert(cond, __VA_ARGS__)
+#if __STDC_VERSION__ > 201112L
+#define FORMAT__STATIC_ASSERT(cond, ...) _Static_assert(cond __VA_OPT__(, ) __VA_ARGS__)
 #else
 #define FORMAT___STATIC_ASSERT2(ident_, cond, ...)                                               \
 	typedef char ident_[(cond) ? 1 : -1] format_unused
@@ -188,22 +188,40 @@ struct format_env
 	size_t size;
 };
 
+struct format_arg_collection;
+
+/**
+ * @brief Callback evaluated by @ref format_collection_iterator
+ *
+ * Return values:
+ *  - `0`: Stop iterating
+ *  - `-1`: Error, returned by @ref format_collection_iterator
+ *  - Any other value lets the iterator continue
+ */
+typedef int (*format_collection_callback)(const struct format_arg_collection* collection,
+                                          uint64_t,
+                                          void* cookie);
+/**
+ * @brief Collection iterator
+ *
+ * This function iterates the collection and calls @ref format_collection_callback on every values
+ * in the collection
+ */
+typedef int (*format_collection_iterator)(const struct format_arg_collection* collection,
+                                          const void* data,
+                                          size_t n,
+                                          format_collection_callback callback,
+                                          void* cookie);
+
 /**
  * @class format_arg_collection
  * @brief Format argument for collections
  *
- * @ref next Is an iterator-like function that returns the current value of the collection and
- * advance the internal cursor
- * @ref width Return the total width required to format the collection, it muse use @ref formatter
  * @ref formatter Is the individual formater for the values inside the collection
  */
 struct format_arg_collection
 {
-	/** @brief Opaque iterator state, managed by the caller */
-	void* state;
-	/** @brief Get the next element in the collection, NULL when exhausted */
-	const void* (*next)(struct format_arg_collection* collection);
-	size_t (*width)(struct format_arg_collection* collection, const char* fmt, size_t n);
+	format_collection_iterator iterator;
 	/** @brief Formatter for elements in the collection */
 	int (*formatter)(struct format_output*, const char*, const struct format_env*, size_t);
 	/** @brief `sizeof(array[0])` */
@@ -998,37 +1016,40 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 
 #define FORMAT__MAPPER_CHOOSE(ARG, RULE)                                                         \
 	__builtin_choose_expr(__builtin_types_compatible_p(FORMAT__SELECT(0, RULE), typeof(ARG)),    \
-	                      format_arg__.payload.formatter = FORMAT__SELECT(1, RULE),              \
+	                      formatter__ = FORMAT__SELECT(1, RULE),                                 \
 	                      (void)0);
 #define FORMAT__CHOOSE(ARG)                                                                      \
-	FORMAT__EXPAND(                                                                              \
-	  FORMAT__EVAL_T32(FORMAT__MAP_CONST(FORMAT__MAPPER_CHOOSE,                                  \
-	                                     ARG,                                                    \
-	                                     (long long, format_fmt_long_long),                      \
-	                                     (long, format_fmt_long),                                \
-	                                     (int, format_fmt_int),                                  \
-	                                     (short, format_fmt_short),                              \
-	                                     (signed char, format_fmt_signed_char),                  \
-	                                     (unsigned long long, format_fmt_unsigned_long_long),    \
-	                                     (unsigned long, format_fmt_unsigned_long),              \
-	                                     (unsigned int, format_fmt_unsigned_int),                \
-	                                     (unsigned short, format_fmt_unsigned_short),            \
-	                                     (unsigned char, format_fmt_unsigned_char),              \
-	                                     (float, format_fmt_float),                              \
-	                                     (double, format_fmt_double),                            \
-	                                     (char, format_fmt_char),                                \
-	                                     (const char*, format_fmt_str),                          \
-	                                     (const char[], format_fmt_str),                         \
-	                                     (char*, format_fmt_str),                                \
-	                                     (char[], format_fmt_str))))
+	({                                                                                           \
+		void* formatter__ = NULL;                                                                \
+		FORMAT__EXPAND(FORMAT__EVAL_T32(                                                         \
+		  FORMAT__MAP_CONST(FORMAT__MAPPER_CHOOSE,                                               \
+		                    ARG,                                                                 \
+		                    (long long, format_fmt_long_long),                                   \
+		                    (long, format_fmt_long),                                             \
+		                    (int, format_fmt_int),                                               \
+		                    (short, format_fmt_short),                                           \
+		                    (signed char, format_fmt_signed_char),                               \
+		                    (unsigned long long, format_fmt_unsigned_long_long),                 \
+		                    (unsigned long, format_fmt_unsigned_long),                           \
+		                    (unsigned int, format_fmt_unsigned_int),                             \
+		                    (unsigned short, format_fmt_unsigned_short),                         \
+		                    (unsigned char, format_fmt_unsigned_char),                           \
+		                    (float, format_fmt_float),                                           \
+		                    (double, format_fmt_double),                                         \
+		                    (char, format_fmt_char),                                             \
+		                    (const char*, format_fmt_str),                                       \
+		                    (const char[], format_fmt_str),                                      \
+		                    (char*, format_fmt_str),                                             \
+		                    (char[], format_fmt_str))))                                          \
+		formatter__;                                                                             \
+	})
 
 #define FORMAT__FORMATTER_TRIPLET_COLLECTION(DATA, FIELD)                                        \
 	format_arg__.type = kFormatCollection;                                                       \
 	typeof(*FIELD)* format_arg_triplet__ = FIELD;                                                \
 	(void)format_arg_triplet__;                                                                  \
 	format_arg__.payload.collection = (DATA);                                                    \
-	assert(format_arg__.payload.collection.next != NULL);                                        \
-	assert(format_arg__.payload.collection.width != NULL);                                       \
+	assert(format_arg__.payload.collection.iterator != NULL);                                    \
 	assert(format_arg__.payload.collection.formatter != NULL);                                   \
 	format_arg__.data = (uint64_t)(uintptr_t)(FIELD);
 #define FORMAT__FORMATTER_TRIPLET_SUBOBJECT(FORMATTER, FIELD)                                    \
@@ -1053,7 +1074,7 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		FORMAT__IF_ELSE(FORMAT__IS_TRIPLET(ARG))(FORMAT__FORMATTER_TRIPLET(                      \
 		  FORMAT__SELECT(0, ARG), FORMAT__SELECT(1, ARG), FORMAT__SELECT(2, ARG)))(              \
 		  FORMAT__IF_ELSE(FORMAT__IS_PAIR(ARG))(format_arg__.payload.formatter =                 \
-		                                          FORMAT__SELECT(0, ARG))(FORMAT__CHOOSE(ARG))); \
+		                                          FORMAT__SELECT(0, ARG))(format_arg__.payload.formatter = FORMAT__CHOOSE(ARG))); \
 		FORMAT__IF_ELSE(                                                                         \
 		  FORMAT__IS_TRIPLET(ARG))()(/* respect strict-aliasing */                               \
 		                             assert(format_arg__.payload.formatter != NULL &&            \
@@ -1110,78 +1131,48 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
  * @{
  */
 
-/**
- * @class format_collection_array_cursor
- * @brief Array formatter cursor
- */
-struct format_collection_array_cursor
+static inline int
+format__collection_iterator_array(const struct format_arg_collection* collection,
+                                  const void* array,
+                                  size_t n,
+                                  format_collection_callback callback,
+                                  void* cookie)
 {
-	const void* cur;
-};
-
-static inline const void*
-format__collection_array_next(struct format_arg_collection* collection)
-{
-	struct format_collection_array_cursor* c = collection->state;
-	const void* p = c->cur;
-	c->cur = (char*)c->cur + collection->elem_size;
-	return p;
-}
-
-static inline size_t
-format__collection_array_width(struct format_arg_collection* collection,
-                               const char* fmt,
-                               size_t n)
-{
-	struct format_collection_array_cursor c =
-	  *(struct format_collection_array_cursor*)collection->state;
-
-	struct format_arg arg;
-	arg.type = kFormatScalar;
-	arg.payload.formatter = collection->formatter;
-
-	struct format_env env = {
-		.args = (struct format_arg*)&arg,
-		.size = 1,
-	};
-
-	struct format_output out = format_output_none();
 	for (size_t i = 0; i < n; ++i) {
-		const void* val = c.cur;
+		const void* val = (const void*)((const char*)array + i * collection->elem_size);
 
-		if (collection->is_pointer)
-			arg.data = (uint64_t)*(uintptr_t*)val;
-		else {
-			arg.data = 0;
-			assert(collection->elem_size <= sizeof(uint64_t));
-			memcpy(&arg.data, val, collection->elem_size);
+		int result;
+		if (collection->is_pointer) {
+			result = callback(collection, (uint64_t)*(uintptr_t*)val, cookie);
+		} else {
+			uint64_t value = 0;
+			memcpy(&value, val, collection->elem_size);
+			result = callback(collection, value, cookie);
 		}
-		collection->formatter(&out, fmt, &env, 0);
-		c.cur = (char*)c.cur + collection->elem_size;
+		if (result == -1)
+			return -1;
+		if (result == 0)
+			break;
 	}
 
-	return out.nwritten;
+	return 0;
 }
 
 #define FORMAT__ARRAY_0(ARRAY)                                                                   \
 	(COLLECTION,                                                                                 \
-	 ((struct format_arg_collection){                                                            \
-	   .state = &(struct format_collection_array_cursor){ .cur = (format_arg_triplet__) },       \
-	   .next = format__collection_array_next,                                                    \
-	   .width = format__collection_array_width,                                                  \
-	   .formatter = __extension__({ format_fmt_int; }),                                          \
-	   .elem_size = sizeof(*(format_arg_triplet__)),                                             \
-	   .is_pointer = FORMAT__IS_POINTER_VAR_P(*(format_arg_triplet__)) }),                       \
+	 ((struct format_arg_collection){ .iterator = format__collection_iterator_array,             \
+	                                  .formatter = FORMAT__CHOOSE(*format_arg_triplet__),                       \
+	                                  .elem_size = sizeof(*(format_arg_triplet__)),              \
+	                                  .is_pointer =                                              \
+	                                    FORMAT__IS_POINTER_VAR_P(*(format_arg_triplet__)) }),    \
 	 ARRAY)
 #define FORMAT__ARRAY_1(ARRAY, FORMATTER)                                                        \
 	(COLLECTION,                                                                                 \
-	 ((struct format_arg_collection){                                                            \
-	   .state = &(struct format_collection_array_cursor){ .cur = (format_arg_triplet__) },       \
-	   .next = format__collection_array_next,                                                    \
-	   .width = format__collection_array_width,                                                  \
-	   .formatter = FORMATTER,                                                                   \
-	   .elem_size = sizeof(*(format_arg_triplet__)),                                             \
-	   .is_pointer = FORMAT__IS_POINTER_VAR_P(*(format_arg_triplet__)) }),                       \
+	 ((struct format_arg_collection){ .iterator = format__collection_iterator_array,             \
+	                                  .formatter = FORMATTER,                                    \
+	                                  .elem_size = sizeof(*(format_arg_triplet__)),              \
+	                                  .is_pointer =                                              \
+	                                    FORMAT__IS_POINTER_VAR_P(*(format_arg_triplet__)) }),    \
 	 ARRAY)
 
 /**

@@ -112,6 +112,72 @@ parse_collection_spec(const char* fmt_spec, const struct format_env* env)
 	return spec;
 }
 
+/** @brief Data for @ref width_callback */
+struct width_data
+{
+	struct format_output* output;
+	const char* format;
+};
+
+/**
+ * @brief Callback to compute the width required to format array
+ */
+static inline int
+width_callback(const struct format_arg_collection* collection, uint64_t value, void* cookie)
+{
+	struct width_data* data = cookie;
+
+	struct format_arg arg = {
+		.type = kFormatScalar,
+		.payload.formatter = collection->formatter,
+		.data = value,
+	};
+	struct format_env env = {
+		.args = &arg,
+		.size = 1,
+	};
+
+	if (collection->formatter(data->output, data->format, &env, 0))
+		return -1;
+
+	return 1;
+}
+
+/** @brief Data for @ref format_callback */
+struct format_data
+{
+	struct format_output* output;
+	const char* format;
+	const struct format_spec_placeholder* sep;
+	size_t i;
+};
+
+static inline int
+format_callback(const struct format_arg_collection* collection, uint64_t value, void* cookie)
+{
+	struct format_data* data = cookie;
+
+	struct format_arg arg = {
+		.type = kFormatScalar,
+		.payload.formatter = collection->formatter,
+		.data = value,
+	};
+	struct format_env env = {
+		.args = &arg,
+		.size = 1,
+	};
+
+	if (data->i != 0) {
+		if (format_write_placeholder(data->output, data->sep, (size_t)-1, 0))
+			return -1;
+	}
+	if (collection->formatter(data->output, data->format, &env, 0))
+		return -1;
+	++data->i;
+
+	return 1;
+}
+
 int
 format_fmt_collection(struct format_output* output,
                       const char* fmt_spec,
@@ -122,26 +188,19 @@ format_fmt_collection(struct format_output* output,
 	assert(spec.left[0] == '}' && "Leftover content in format specifier");
 
 	struct format_arg_collection* collection = &env->args[idx].payload.collection;
+	assert(collection->iterator);
 	assert(collection->formatter);
-	assert(collection->width);
 
 	/* Compute width */
-	const size_t width = collection->width(collection, spec.subexpr, spec.precision) +
-	                     spec.start.width + spec.end.width +
-	                     (spec.precision > 1 ? spec.sep.width * (spec.precision - 1) : 0);
-
-	struct format_arg args[2];
-	args[0].type = kFormatScalar;
-	args[0].payload.formatter = collection->formatter;
-
-	args[1].type = kFormatScalar;
-	args[1].payload.formatter = NULL;
-	args[1].data = 0;
-
-	struct format_env subenv = {
-		.args = (struct format_arg*)&args,
-		.size = 1,
+	struct format_output output_none = format_output_none();
+	struct width_data wdata = {
+		.output = &output_none,
+		.format = spec.subexpr,
 	};
+	collection->iterator(
+	  collection, (void*)(uintptr_t)env->args[idx].data, spec.precision, width_callback, &wdata);
+	const size_t width = wdata.output->nwritten + spec.start.width + spec.end.width +
+	                     (spec.precision > 1 ? spec.sep.width * (spec.precision - 1) : 0);
 
 	/* Compute alignment */
 	size_t left = 0, right = 0;
@@ -167,22 +226,16 @@ format_fmt_collection(struct format_output* output,
 	/* Left delim */
 	if (format_write_placeholder(output, &spec.start, (size_t)-1, 0))
 		return -1;
-	for (size_t i = 0; i < spec.precision; ++i) {
-		if (i != 0) {
-			if (format_write_placeholder(output, &spec.sep, (size_t)-1, 0))
-				return -1;
-		}
-		const void* val = collection->next(collection);
 
-		if (collection->is_pointer)
-			args[0].data = (uint64_t)*(uintptr_t*)val;
-		else
-		{
-			args[0].data = 0;
-			memcpy(&args[0].data, val, collection->elem_size);
-		}
-		collection->formatter(output, spec.subexpr, &subenv, 0);
-	}
+	struct format_data fdata = {
+		.output = output,
+		.format = spec.subexpr,
+		.sep = &spec.sep,
+		.i = 0,
+	};
+	collection->iterator(
+	  collection, (void*)(uintptr_t)env->args[idx].data, spec.precision, format_callback, &fdata);
+
 	/* Right delim */
 	if (format_write_placeholder(output, &spec.end, (size_t)-1, 0))
 		return -1;

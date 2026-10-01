@@ -71,8 +71,7 @@ parse_number_spec(const char* fmt_spec, const struct format_env* env)
 		.type = 0,
 		.left = fmt_spec,
 	};
-	if (*fmt_spec == '}')
-	{
+	if (*fmt_spec == '}') {
 		spec.align = '<';
 		return spec;
 	}
@@ -207,13 +206,13 @@ write_aligned(struct format_output* output,
 		char buf[sizeof(type__) * 8 + 16];                                                       \
                                                                                                  \
 		/* Get base */                                                                           \
-		const type__ base = (tolower(spec.type) == 'x')   ? 16                                   \
-		                    : (tolower(spec.type) == 'b') ? 2                                    \
-		                                                  : 10;                                  \
+		const type__ base = (type__)((tolower(spec.type) == 'x')   ? 16                          \
+		                             : (tolower(spec.type) == 'b') ? 2                           \
+		                                                           : 10);                        \
                                                                                                  \
 		/* Compute length in base */                                                             \
 		size_t len = 0;                                                                          \
-		for (type__ x = val; x; x /= base)                                                       \
+		for (type__ x = val; x; x = (type__)(x / base))                                          \
 			++len;                                                                               \
 		if (val == 0)                                                                            \
 			len = 1;                                                                             \
@@ -235,7 +234,7 @@ write_aligned(struct format_output* output,
 			type__ x = val;                                                                      \
 			for (size_t i = 0; x; ++i) {                                                         \
 				const int d = (int)(x % base);                                                   \
-				x /= base;                                                                       \
+				x = (type__)(x / base);                                                          \
 				switch (spec.type) {                                                             \
 					case 'x':                                                                    \
 						buf[len - i - 1] = FORMAT_HEX[d];                                        \
@@ -271,7 +270,7 @@ write_aligned(struct format_output* output,
                                                                                                  \
 		/* Compute length in base */                                                             \
 		size_t len = 0;                                                                          \
-		for (type__ x = val; x; x /= base)                                                       \
+		for (type__ x = val; x; x = (type__)(x / base))                                          \
 			++len;                                                                               \
 		if (val == 0)                                                                            \
 			len = 1;                                                                             \
@@ -301,7 +300,7 @@ write_aligned(struct format_output* output,
 			type__ x = val;                                                                      \
 			for (size_t i = 0; x; ++i) {                                                         \
 				const int d = val >= 0 ? (int)(x % base) : -(int)(x % base);                     \
-				x /= base;                                                                       \
+				x = (type__)(x / base);                                                          \
 				switch (spec.type) {                                                             \
 					case 'x':                                                                    \
 						buf[len - i - 1] = FORMAT_HEX[d];                                        \
