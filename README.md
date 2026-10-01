@@ -12,6 +12,30 @@ This library requires a Gnu99 compiler (gcc or clang). Mind you that the recomme
 If you use this library in a Gnu99 project, you will get warnings when including the `include/format.h` header.
 These warnings can be ignored, but you might want so silence them globally.
 
+- [Usage](#usage)
+  - [Setup](#setup)
+  - [Examples](#examples)
+  - [Outputs](#outputs)
+- [Grammar](#grammar)
+  - [Basis](#basis)
+    - [Number](#number)
+    - [Size](#size)
+    - [Specifier](#specifier)
+    - [Alignment](#alignment)
+  - [Style & Colors](#style--colors)
+  - [Type Formatting](#type-formatting)
+    - [String](#string)
+    - [Char](#char)
+    - [Signed Integers](#signed-integers)
+    - [Unsigned Integers](#unsigned-integers)
+- [Advanced usage](#advanced-usage)
+  - [Collection formatting](#collection-formatting)
+  - [Custom Allocators](#custom-allocators)
+  - [Experimental APIs](#experimental-apis)
+- [Q&A](#qa)
+- [Planned Features](#planned-features)
+- [License](#license)
+
 # Usage
 
 See [Advanced usage](#advanced-usage) if you want more options.
@@ -602,7 +626,6 @@ mmap_realloc(void *ptr, size_t old_size, size_t new_size)
 {
 	if (!ptr)
 	{
-		cr_assert_eq(old_size, 0);
 		return mmap_malloc(new_size);
 	}
 
