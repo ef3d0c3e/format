@@ -75,6 +75,7 @@ $(CRITERION_PC): $(CRITERION_BUILD)/build.ninja
 $(TEST): $(TEST_OBJECTS) $(LIB) $(CRITERION_PC)
 	@mkdir -p $(@D)
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) $(IFLAGS) \
+		-Wl,-Bstatic -lcriterion -Wl,-Bdynamic \
 		$$(PKG_CONFIG_PATH=$(CRITERION_PKGCONFIG) pkg-config --static --cflags criterion) \
 		-o $@ \
 		$(TEST_OBJECTS) \
@@ -112,7 +113,7 @@ clean:
 
 .PHONY: fclean
 fclean: clean
-	$(RM) $(NAME)
+	$(RM) $(LIB)
 
 .PHONY: re
 re: fclean all

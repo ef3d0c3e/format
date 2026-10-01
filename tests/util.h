@@ -145,7 +145,7 @@ do { \
 	} \
 	FORMAT__END_DIAG(clang) \
 	FORMAT__END_DIAG(gcc) \
-} while (false)
+} while (0)
 
 #define test_manual(fmt_format_, expected_, ...) \
 do { \
@@ -222,7 +222,7 @@ do { \
 	} \
 	FORMAT__END_DIAG(clang) \
 	FORMAT__END_DIAG(gcc) \
-} while (false)
+} while (0)
 
 #define CONCAT_(x, y) x ## y
 #define CONCAT(x, y) CONCAT_(x, y)
