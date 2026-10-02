@@ -29,9 +29,10 @@ These warnings can be ignored, but you might want so silence them globally.
     - [Signed Integers](#signed-integers)
     - [Unsigned Integers](#unsigned-integers)
 - [Advanced usage](#advanced-usage)
-  - [Collection formatting](#collection-formatting)
+  - [Collection Formatting](#collection-formatting)
   - [Custom Allocators](#custom-allocators)
   - [Experimental APIs](#experimental-apis)
+  - [Default Formatters](#default-formatters)
 - [Q&A](#qa)
 - [Planned Features](#planned-features)
 - [License](#license)
@@ -424,7 +425,8 @@ when present, numbers formatted in hexadecimal, or binary will show the `0x`/`0X
 
 **Precision**
 
-Precision operates like printf's, the value corresponds to the minimum width of the number to display. If the number requires less digits than the precision, then it's *prepended* with 0's.
+Precision operates like printf's, the value corresponds to the minimum width of the number to display.
+If the number requires less digits than the precision, then it's *prepended* with 0's.
 
 For instance, `format(out, "{:.5}", -1)` will display `-00001`, while `format(out, "{:.5}", 123456)` will display `123456`.
 
@@ -474,7 +476,7 @@ $(LIBFORMAT_A):
     $(MAKE) EXTRA_CFLAGS='-O2' -C $(dir $(LIBFORMAT_A))
 ```
 
-## Collection formatting
+## Collection Formatting
 
 You can format collections with the following code:
 ```c
@@ -556,8 +558,8 @@ iterator_linked_list(const struct format_arg_collection* collection,
 ```
 
 The iterator for arrays is part of format, so you can invoke it like this:
- - `FORMAT_ARRAY(array)` if you want to use the default formatter for elements
- - `FORMAT_ARRAY(array, collection)` if you wish to specify the formatter
+ - `FORMAT_ARRAY(array)` if you want to use the default formatter for the array's elements
+ - `FORMAT_ARRAY(array, formatter)` if you wish to specify the formatter
 
 **Examples**
 ```c
@@ -655,6 +657,35 @@ format_output_set_allocator(&out, mmap_malloc, mmap_free, mmap_realloc);
 ```
 **NOTE:** It is undefined behavior to change the allocator after you've called `format` or `format_output_write` on the output.
 
+## Default Formatters
+
+The library currently defines the following formatters:
+
+**Integers**
+ * `format_fmt_long_long`: formatter for `long long`
+ * `format_fmt_unsigned_long_long`: formatter for `unsigned long long`
+ * `format_fmt_long`: formatter for `long`
+ * `format_fmt_unsigned_long`: formatter for `unsigned long`
+ * `format_fmt_int`: formatter for `int`
+ * `format_fmt_unsigned_int`: formatter for `unsigned int`
+ * `format_fmt_short`: formatter for `short`
+ * `format_fmt_unsigned_short`: formatter for `unsigned short`
+ * `format_fmt_signed_char`: formatter for `signed char`
+ * `format_fmt_unsigned_char`: formatter for `unsigned char`
+
+**Char/String**
+ * `format_fmt_char`: formatter for `char`
+ * `format_fmt_str`: formatter for `const char*`
+
+**Collections**
+ * `format_fmt_collection`: formatter for collections
+
+The following are declared, but not implemented:
+ * `format_fmt_float`: formatter for `float`
+ * `format_fmt_double`: formatter for `double`
+
+These two are not currently implemented, but they're part of the macro that selects formatter based on the argument's type.
+
 ## Experimental APIs
 
 Currently there is 1 experimental APIs: Object formatting.
@@ -683,7 +714,7 @@ The library doesn't touch `errno`, so you might want to handle certain errors. N
 **A:** Unicode is supported at the code point level, through UTF-8.
 Format strings can contain code points without any issue.
 However, the library treats one code point as one unit of width, no `wcwidth`.
-The reason behind this is that on most modern terminals, `wcwidth` is deprecated because you need to know the font used in order to properly account for width.
+The reason behind this is that on most modern terminals, `wcwidth` is deprecated because you need to implement grapheme clustering (UAX29) and sometime the font in order to compute the actual display width.
 For instance `🧑🏽‍🦽` is a single grapheme with 4 code points.
 It should display using two cells, but `wcwidth` doesn't support graphemes at all, so it might chose 6 cells instead (man + skin tone + wheelchair).
 On top of that, for proper width computation, you need to know the font, because fonts can define custom substitutions.
@@ -702,9 +733,9 @@ Nevertheless, I have plans on improving this in the future.
 **A:** This library never allocates if you're formatting to a `FILE*`, or to a file descriptors in `kFormatFlushAlways` mode.
 Otherwise, it will allocate memory in the following scenarios:
  * Formatting to a file descriptor in `kFormatFlushNewline` or `kFormatFlushNone` (1024 bytes).
- * Formatting to an internal buffer, this is the required behavior to emulate `asprintf`.
+ * Formatting to an internal buffer, this is required in order to emulate `asprintf`-like functionalities.
 
-Note that there are plans to let you specify a custom allocator, there is an untested API to do it right now, but until it's thoroughly tested, you should not use it.
+Note that you can specify a [custom allocator](#custom-allocators).
 
 **Q:** Which part of the library is public and which parts are private?
 
@@ -715,8 +746,6 @@ In order to separate what's public from private, everything that starts with `fo
  - Float formatting
  - Proper object formatting
  - Time formatting
- - Easier API for formatting collections
- - Proper custom allocators support
  - Support for formatting to a user-owned buffer
 
 # License
