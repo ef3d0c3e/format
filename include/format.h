@@ -1067,7 +1067,7 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 #define FORMAT__MAPPER(ARG)                                                                      \
 	__extension__({                                                                              \
 		FORMAT__STATIC_ASSERT((FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)) ||            \
-		                       sizeof(FORMAT__MAPPER_VALUE(ARG)) <= sizeof(uint64_t)) &&         \
+		                       sizeof(typeof(FORMAT__MAPPER_VALUE(ARG))) <= sizeof(uint64_t)) &&   \
 		                      "Cannot format type, did you mean to use a pointer instead?");     \
 		struct format_arg format_arg__;                                                          \
 		format_arg__.type = kFormatScalar;                                                       \
@@ -1085,8 +1085,14 @@ FORMAT__STATIC_ASSERT(FORMAT__HAS_ARG(2, (1, 2), 5, (3, 4)));
 		    FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)),                                 \
 		    __extension__({ (uint64_t)(uintptr_t)(FORMAT__MAPPER_VALUE(ARG)); }),                \
 		    __extension__({                                                                      \
-			    const typeof(FORMAT__MAPPER_VALUE(ARG)) format_temp__ =                          \
-			      FORMAT__MAPPER_VALUE(ARG);                                                     \
+			    /* never instantiated for pointers: give the dead branch a harmless type */      \
+			    const typeof(__builtin_choose_expr(                                              \
+			      FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)),                           \
+			      (uint64_t)0,                                                                   \
+			      FORMAT__MAPPER_VALUE(ARG))) format_temp__ =                                    \
+			      __builtin_choose_expr(FORMAT__IS_POINTER_VAR_P(FORMAT__MAPPER_VALUE(ARG)),     \
+			                            (uint64_t)0,                                             \
+			                            FORMAT__MAPPER_VALUE(ARG));                              \
 			    typeof(format_arg__.data) format_result__ = 0;                                   \
 			    FORMAT__STATIC_ASSERT(sizeof(typeof(format_arg__.data)) <= sizeof(uint64_t));    \
 			    memcpy(&format_result__, &format_temp__, sizeof(format_temp__));                 \
